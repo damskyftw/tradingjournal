@@ -1,5 +1,6 @@
 import { app, BrowserWindow, shell } from 'electron';
 import { join } from 'path';
+import { setupIpcHandlers } from './ipc/handlers';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -64,6 +65,9 @@ let mainWindow: MainWindow | null = null;
 
 // App event handlers
 app.whenReady().then(() => {
+  // Setup IPC handlers for secure communication
+  setupIpcHandlers();
+  
   mainWindow = new MainWindow();
 
   app.on('activate', () => {
