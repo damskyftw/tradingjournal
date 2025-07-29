@@ -259,9 +259,9 @@ export function Dashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Analytics Dashboard</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
           <p className="text-slate-600">
-            Comprehensive insights into your trading performance
+            Overview of your trading performance and key insights
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -284,27 +284,387 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="flex gap-4">
-        <Button asChild>
-          <Link to="/trades/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Trade
-          </Link>
-        </Button>
-        <Button variant="outline" asChild>
-          <Link to="/thesis/new">
-            <FileText className="mr-2 h-4 w-4" />
-            New Thesis
-          </Link>
-        </Button>
-        <Button variant="outline" asChild>
-          <Link to="/analytics">
-            <BarChart3 className="mr-2 h-4 w-4" />
-            Detailed Analytics
-          </Link>
-        </Button>
+      {/* Dashboard Widgets Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Current Thesis Summary - Large Widget */}
+        <div className="lg:col-span-4">
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                Current Thesis
+              </CardTitle>
+              <CardDescription>
+                Your active trading strategy for this quarter
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const currentYear = new Date().getFullYear()
+                const currentQuarter = `Q${Math.ceil((new Date().getMonth() + 1) / 3)}`
+                const activeThesis = theses.find(
+                  thesis => thesis.year === currentYear && 
+                           thesis.quarter === currentQuarter && 
+                           thesis.isActive
+                )
+
+                if (activeThesis) {
+                  return (
+                    <div 
+                      className="space-y-4 cursor-pointer hover:bg-slate-50 p-3 rounded-lg transition-colors"
+                      onClick={() => window.location.href = `/thesis/${activeThesis.id}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-lg">{activeThesis.title}</h3>
+                        <Badge variant="default" className="bg-green-100 text-green-800">
+                          {activeThesis.quarter} {activeThesis.year}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-slate-600">
+                        <div className="flex items-center gap-1">
+                          <Activity className="h-4 w-4" />
+                          <span>{activeThesis.tradeCount} trades linked</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          <span>Created {format(new Date(activeThesis.createdAt), 'MMM dd')}</span>
+                        </div>
+                      </div>
+                      <div className="text-xs text-slate-500 hover:text-blue-600 transition-colors">
+                        Click to view details and edit →
+                      </div>
+                    </div>
+                  )
+                } else {
+                  return (
+                    <div className="text-center py-8 space-y-4">
+                      <FileText className="h-12 w-12 text-slate-300 mx-auto" />
+                      <div>
+                        <h3 className="font-medium text-slate-900">No Active Thesis</h3>
+                        <p className="text-sm text-slate-600 mb-4">
+                          Create a thesis for {currentQuarter} {currentYear} to guide your trading.
+                        </p>
+                        <Button asChild size="sm">
+                          <Link to="/thesis/new">
+                            <Plus className="mr-2 h-4 w-4" />
+                            Create Thesis
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                }
+              })()}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Trades - Medium Widget */}
+        <div className="lg:col-span-4">
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Recent Trades
+              </CardTitle>
+              <CardDescription>
+                Your last 5 trades
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const recentTrades = tradeSelectors.allTrades
+                  .sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime())
+                  .slice(0, 5)
+
+                if (recentTrades.length === 0) {
+                  return (
+                    <div className="text-center py-8 space-y-4">
+                      <Activity className="h-12 w-12 text-slate-300 mx-auto" />
+                      <div>
+                        <h3 className="font-medium text-slate-900">No Trades Yet</h3>
+                        <p className="text-sm text-slate-600 mb-4">
+                          Start your trading journal by recording your first trade.
+                        </p>
+                        <Button asChild size="sm">
+                          <Link to="/trades/new">
+                            <Plus className="mr-2 h-4 w-4" />
+                            New Trade
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                }
+
+                return (
+                  <div className="space-y-3">
+                    {recentTrades.map((trade) => (
+                      <div
+                        key={trade.id}
+                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
+                        onClick={() => window.location.href = `/trades/${trade.id}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="text-sm font-medium">{trade.ticker}</div>
+                          <Badge variant={trade.type === 'long' ? 'default' : 'secondary'}>
+                            {trade.type}
+                          </Badge>
+                          {trade.outcome && (
+                            <Badge 
+                              variant="outline" 
+                              className={
+                                trade.outcome === 'win' ? 'border-green-600 text-green-700' :
+                                trade.outcome === 'loss' ? 'border-red-600 text-red-700' :
+                                'border-yellow-600 text-yellow-700'
+                              }
+                            >
+                              {trade.outcome}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm text-slate-600">
+                            {format(new Date(trade.entryDate), 'MMM dd')}
+                          </div>
+                          {trade.profitLoss && (
+                            <div className={`text-sm font-medium ${
+                              trade.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {formatCurrency(trade.profitLoss)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="pt-2 border-t">
+                      <Button variant="ghost" size="sm" asChild className="w-full">
+                        <Link to="/trades">
+                          View All Trades →
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })()}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Actions - Small Widget */}
+        <div className="lg:col-span-4">
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Plus className="h-5 w-5" />
+                Quick Actions
+              </CardTitle>
+              <CardDescription>
+                Common operations and shortcuts
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <Button asChild className="w-full justify-start">
+                  <Link to="/trades/new">
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Trade
+                  </Link>
+                </Button>
+                <Button variant="outline" asChild className="w-full justify-start">
+                  <Link to="/thesis/new">
+                    <FileText className="mr-2 h-4 w-4" />
+                    New Thesis
+                  </Link>
+                </Button>
+                <Button variant="outline" asChild className="w-full justify-start">
+                  <Link to="/analytics">
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    Analytics
+                  </Link>
+                </Button>
+                <Button variant="ghost" asChild className="w-full justify-start">
+                  <Link to="/trades">
+                    <Activity className="mr-2 h-4 w-4" />
+                    All Trades
+                  </Link>
+                </Button>
+                <Button variant="ghost" asChild className="w-full justify-start">
+                  <Link to="/thesis">
+                    <Target className="mr-2 h-4 w-4" />
+                    All Theses
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
+      {/* Goal Progress Widget */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5" />
+            Goal Progress
+          </CardTitle>
+          <CardDescription>
+            Track your progress toward thesis goals and overall objectives
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(() => {
+            const currentYear = new Date().getFullYear()
+            const currentQuarter = `Q${Math.ceil((new Date().getMonth() + 1) / 3)}`
+            const activeThesis = theses.find(
+              thesis => thesis.year === currentYear && 
+                       thesis.quarter === currentQuarter && 
+                       thesis.isActive
+            )
+
+            if (!activeThesis) {
+              return (
+                <div className="text-center py-6 text-slate-500">
+                  <Target className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+                  <p>Create an active thesis to track goal progress</p>
+                </div>
+              )
+            }
+
+            // Calculate progress for this thesis (mock data - would be real from thesis metrics)
+            const tradeCountProgress = Math.min((stats.totalTrades / 50) * 100, 100) // Assuming 50 trade goal
+            const winRateProgress = Math.min((stats.winRate * 100 / 60), 100) // Assuming 60% win rate goal
+            const profitProgress = Math.min(((stats.netPnL / 10000) * 100), 100) // Assuming $10k profit goal
+
+            return (
+              <div className="space-y-6">
+                {/* Trade Count Progress */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Trade Count</span>
+                    <span className="text-sm text-slate-600">
+                      {stats.totalTrades} / 50 trades
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${tradeCountProgress}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between mt-1 text-xs text-slate-500">
+                    <span>0</span>
+                    <span>{tradeCountProgress.toFixed(0)}%</span>
+                    <span>50</span>
+                  </div>
+                </div>
+
+                {/* Win Rate Progress */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Win Rate Target</span>
+                    <span className="text-sm text-slate-600">
+                      {formatPercentage(stats.winRate)} / 60%
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        stats.winRate >= 0.6 ? 'bg-green-600' : 'bg-yellow-600'
+                      }`}
+                      style={{ width: `${winRateProgress}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between mt-1 text-xs text-slate-500">
+                    <span>0%</span>
+                    <span>{winRateProgress.toFixed(0)}%</span>
+                    <span>60%</span>
+                  </div>
+                </div>
+
+                {/* Profit Target Progress */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Profit Target</span>
+                    <span className="text-sm text-slate-600">
+                      {formatCurrency(stats.netPnL)} / $10,000
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        stats.netPnL >= 0 ? 'bg-green-600' : 'bg-red-600'
+                      }`}
+                      style={{ width: `${Math.min(Math.max(profitProgress, 0), 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between mt-1 text-xs text-slate-500">
+                    <span>$0</span>
+                    <span>{profitProgress.toFixed(0)}%</span>
+                    <span>$10,000</span>
+                  </div>
+                </div>
+
+                {/* Overall Progress Summary */}
+                <div className="pt-4 border-t border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-slate-900">Overall Progress</span>
+                    <span className="text-sm font-medium">
+                      {Math.round((tradeCountProgress + winRateProgress + profitProgress) / 3)}%
+                    </span>
+                  </div>
+                  <div className="mt-2 w-full bg-slate-200 rounded-full h-3">
+                    <div 
+                      className="bg-gradient-to-r from-blue-600 to-green-600 h-3 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.round((tradeCountProgress + winRateProgress + profitProgress) / 3)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+        </CardContent>
+      </Card>
+
+      {/* Quick Stats Summary - Clickable Widget */}
+      <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/analytics'}>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Quick Stats
+            </div>
+            <span className="text-xs text-slate-500">Click for full analytics →</span>
+          </CardTitle>
+          <CardDescription>
+            Key performance metrics at a glance
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-slate-900">{stats.totalTrades}</div>
+              <div className="text-xs text-slate-500">Total Trades</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">{formatPercentage(stats.winRate)}</div>
+              <div className="text-xs text-slate-500">Win Rate</div>
+            </div>
+            <div className="text-center">
+              <div className={`text-2xl font-bold ${getChangeColor(stats.netPnL)}`}>
+                {formatCurrency(stats.netPnL)}
+              </div>
+              <div className="text-xs text-slate-500">Net P&L</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">
+                {stats.profitFactor === Infinity ? '∞' : stats.profitFactor.toFixed(1)}
+              </div>
+              <div className="text-xs text-slate-500">Profit Factor</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
