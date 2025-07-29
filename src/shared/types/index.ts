@@ -89,6 +89,7 @@ export const TradeSummarySchema = z.object({
   type: TradeType,
   outcome: TradeOutcome.optional(),
   profitLoss: z.number().optional(),
+  linkedThesisId: z.string().uuid().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 })

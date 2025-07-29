@@ -2,7 +2,7 @@ import { ipcMain } from 'electron'
 import path from 'path'
 import os from 'os'
 import { FileService } from '../services/FileService'
-import type { Trade, ApiResponse, TradeSummary } from '../../shared/types'
+import type { Trade, Thesis, ApiResponse, TradeSummary, ThesisSummary } from '@shared/types'
 
 // Initialize FileService with data directory in user's home folder
 const getDataDirectory = (): string => {
@@ -124,6 +124,142 @@ export const setupIpcHandlers = (): void => {
     }
   })
 
+  // Handler for saving a thesis
+  ipcMain.handle('thesis:save', async (event, thesis: unknown): Promise<ApiResponse<string>> => {
+    try {
+      // Additional validation to ensure we have a Thesis object
+      if (!thesis || typeof thesis !== 'object') {
+        return {
+          success: false,
+          error: 'Invalid thesis data provided',
+          timestamp: new Date().toISOString(),
+        }
+      }
+
+      return await fileService.saveThesis(thesis as Thesis)
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to save thesis: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  })
+
+  // Handler for loading a single thesis
+  ipcMain.handle('thesis:load', async (event, id: unknown): Promise<ApiResponse<Thesis>> => {
+    try {
+      // Validate ID parameter
+      if (!id || typeof id !== 'string') {
+        return {
+          success: false,
+          error: 'Invalid thesis ID provided',
+          timestamp: new Date().toISOString(),
+        }
+      }
+
+      return await fileService.loadThesis(id)
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to load thesis: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  })
+
+  // Handler for listing all theses
+  ipcMain.handle('thesis:list', async (): Promise<ApiResponse<ThesisSummary[]>> => {
+    try {
+      return await fileService.listTheses()
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to list theses: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  })
+
+  // Handler for deleting a thesis
+  ipcMain.handle('thesis:delete', async (event, id: unknown): Promise<ApiResponse<string>> => {
+    try {
+      // Validate ID parameter
+      if (!id || typeof id !== 'string') {
+        return {
+          success: false,
+          error: 'Invalid thesis ID provided',
+          timestamp: new Date().toISOString(),
+        }
+      }
+
+      return await fileService.deleteThesis(id)
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to delete thesis: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  })
+
+  // Handler for getting active thesis for a quarter/year
+  ipcMain.handle('thesis:getActive', async (event, year: unknown, quarter: unknown): Promise<ApiResponse<Thesis | null>> => {
+    try {
+      // Validate parameters
+      if (!year || typeof year !== 'number' || !quarter || typeof quarter !== 'string') {
+        return {
+          success: false,
+          error: 'Invalid year or quarter provided',
+          timestamp: new Date().toISOString(),
+        }
+      }
+
+      return await fileService.getActiveThesis(year, quarter)
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to get active thesis: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  })
+
+  // Handler for getting thesis performance metrics
+  ipcMain.handle('metrics:thesis', async (event, thesisId: unknown): Promise<ApiResponse<any>> => {
+    try {
+      // Validate thesis ID parameter
+      if (!thesisId || typeof thesisId !== 'string') {
+        return {
+          success: false,
+          error: 'Invalid thesis ID provided',
+          timestamp: new Date().toISOString(),
+        }
+      }
+
+      return await fileService.getThesisPerformanceMetrics(thesisId)
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to get thesis performance metrics: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  })
+
+  // Handler for getting portfolio performance metrics
+  ipcMain.handle('metrics:portfolio', async (): Promise<ApiResponse<any>> => {
+    try {
+      return await fileService.getPortfolioPerformanceMetrics()
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to get portfolio performance metrics: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  })
+
   // Handler for getting application info
   ipcMain.handle('app:getInfo', async (): Promise<ApiResponse<{
     version: string
@@ -159,6 +295,13 @@ export const removeIpcHandlers = (): void => {
   ipcMain.removeAllListeners('trade:load')
   ipcMain.removeAllListeners('trade:list')
   ipcMain.removeAllListeners('trade:delete')
+  ipcMain.removeAllListeners('thesis:save')
+  ipcMain.removeAllListeners('thesis:load')
+  ipcMain.removeAllListeners('thesis:list')
+  ipcMain.removeAllListeners('thesis:delete')
+  ipcMain.removeAllListeners('thesis:getActive')
+  ipcMain.removeAllListeners('metrics:thesis')
+  ipcMain.removeAllListeners('metrics:portfolio')
   ipcMain.removeAllListeners('app:getInfo')
 }
 

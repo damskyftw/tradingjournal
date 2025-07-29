@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Trade, TradeSummary, ApiResponse } from '../shared/types'
+import type { Trade, TradeSummary, Thesis, ThesisSummary, ApiResponse } from '../shared/types'
 
 // Define the API that will be exposed to the renderer process
 const api = {
@@ -32,6 +32,33 @@ const api = {
     
     delete: (id: string): Promise<ApiResponse<string>> => 
       ipcRenderer.invoke('trade:delete', id),
+  },
+
+  // Thesis operations
+  thesis: {
+    save: (thesis: Thesis): Promise<ApiResponse<string>> => 
+      ipcRenderer.invoke('thesis:save', thesis),
+    
+    load: (id: string): Promise<ApiResponse<Thesis>> => 
+      ipcRenderer.invoke('thesis:load', id),
+    
+    list: (): Promise<ApiResponse<ThesisSummary[]>> => 
+      ipcRenderer.invoke('thesis:list'),
+    
+    delete: (id: string): Promise<ApiResponse<string>> => 
+      ipcRenderer.invoke('thesis:delete', id),
+    
+    getActive: (year: number, quarter: string): Promise<ApiResponse<Thesis | null>> => 
+      ipcRenderer.invoke('thesis:getActive', year, quarter),
+  },
+
+  // Performance metrics
+  metrics: {
+    getThesisMetrics: (thesisId: string): Promise<ApiResponse<any>> => 
+      ipcRenderer.invoke('metrics:thesis', thesisId),
+    
+    getPortfolioMetrics: (): Promise<ApiResponse<any>> => 
+      ipcRenderer.invoke('metrics:portfolio'),
   },
 }
 

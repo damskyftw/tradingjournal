@@ -1,0 +1,392 @@
+import { create } from 'zustand'
+import type { Trade, TradeSummary, ApiResponse } from '../../../shared/types'
+import { ApiService, ApiError } from '../services/api'
+
+// =============================================================================
+// TYPES
+// =============================================================================
+
+export interface TradeFilters {
+  ticker?: string
+  type?: 'long' | 'short' | 'all'
+  outcome?: 'win' | 'loss' | 'breakeven' | 'all'
+  dateFrom?: string
+  dateTo?: string
+  thesisId?: string
+}
+
+export interface TradeState {
+  // Data
+  trades: TradeSummary[]
+  activeTrade: Trade | null
+  
+  // Loading states
+  isLoading: boolean
+  isLoadingTrade: boolean
+  isSaving: boolean
+  isDeleting: boolean
+  
+  // Filter state
+  filters: TradeFilters
+  filteredTrades: TradeSummary[]
+  
+  // Error state
+  error: string | null
+  
+  // Actions
+  loadTrades: () => Promise<void>
+  loadTrade: (id: string) => Promise<void>
+  saveTrade: (trade: Trade) => Promise<string | null>
+  deleteTrade: (id: string) => Promise<boolean>
+  setFilters: (filters: Partial<TradeFilters>) => void
+  clearFilters: () => void
+  setActiveTrade: (trade: Trade | null) => void
+  clearError: () => void
+  
+  // Private helper methods
+  _applyFilters: () => void
+  _handleApiError: (response: ApiResponse<any>) => void
+}
+
+// =============================================================================
+// INITIAL STATE
+// =============================================================================
+
+const initialFilters: TradeFilters = {
+  type: 'all',
+  outcome: 'all'
+}
+
+// =============================================================================
+// STORE IMPLEMENTATION
+// =============================================================================
+
+export const useTradeStore = create<TradeState>((set, get) => ({
+  // Initial state
+  trades: [],
+  activeTrade: null,
+  isLoading: false,
+  isLoadingTrade: false,
+  isSaving: false,
+  isDeleting: false,
+  filters: initialFilters,
+  filteredTrades: [],
+  error: null,
+
+  // Actions
+  loadTrades: async () => {
+    set({ isLoading: true, error: null })
+    
+    try {
+      const response = await ApiService.listTrades()
+      
+      if (ApiError.isError(response)) {
+        get()._handleApiError(response)
+        return
+      }
+      
+      const trades = response.data || []
+      set({ 
+        trades,
+        isLoading: false 
+      })
+      
+      // Apply current filters to new data
+      get()._applyFilters()
+      
+    } catch (error) {
+      set({ 
+        error: error instanceof Error ? error.message : 'Failed to load trades',
+        isLoading: false 
+      })
+    }
+  },
+
+  loadTrade: async (id: string) => {
+    set({ isLoadingTrade: true, error: null })
+    
+    try {
+      const response = await ApiService.loadTrade(id)
+      
+      if (ApiError.isError(response)) {
+        get()._handleApiError(response)
+        return
+      }
+      
+      set({ 
+        activeTrade: response.data || null,
+        isLoadingTrade: false 
+      })
+      
+    } catch (error) {
+      set({ 
+        error: error instanceof Error ? error.message : 'Failed to load trade',
+        isLoadingTrade: false 
+      })
+    }
+  },
+
+  saveTrade: async (trade: Trade): Promise<string | null> => {
+    set({ isSaving: true, error: null })
+    
+    try {
+      const response = await ApiService.saveTrade(trade)
+      
+      if (ApiError.isError(response)) {
+        get()._handleApiError(response)
+        return null
+      }
+      
+      const savedId = response.data
+      
+      // Optimistic update: update the trades list
+      const { trades } = get()
+      const existingIndex = trades.findIndex(t => t.id === trade.id)
+      
+      const tradeSummary: TradeSummary = {
+        id: trade.id,
+        ticker: trade.ticker,
+        entryDate: trade.entryDate,
+        exitDate: trade.exitDate,
+        type: trade.type,
+        outcome: trade.postTradeNotes?.outcome,
+        profitLoss: trade.postTradeNotes?.profitLoss,
+        linkedThesisId: trade.linkedThesisId,
+        createdAt: trade.createdAt,
+        updatedAt: trade.updatedAt,
+      }
+      
+      let updatedTrades: TradeSummary[]
+      
+      if (existingIndex >= 0) {
+        // Update existing trade
+        updatedTrades = trades.map((t, index) => 
+          index === existingIndex ? tradeSummary : t
+        )
+      } else {
+        // Add new trade
+        updatedTrades = [tradeSummary, ...trades]
+      }
+      
+      set({ 
+        trades: updatedTrades,
+        activeTrade: trade,
+        isSaving: false 
+      })
+      
+      // Reapply filters
+      get()._applyFilters()
+      
+      return savedId || null
+      
+    } catch (error) {
+      set({ 
+        error: error instanceof Error ? error.message : 'Failed to save trade',
+        isSaving: false 
+      })
+      return null
+    }
+  },
+
+  deleteTrade: async (id: string): Promise<boolean> => {
+    set({ isDeleting: true, error: null })
+    
+    try {
+      const response = await ApiService.deleteTrade(id)
+      
+      if (ApiError.isError(response)) {
+        get()._handleApiError(response)
+        return false
+      }
+      
+      // Optimistic update: remove from trades list
+      const { trades, activeTrade } = get()
+      const updatedTrades = trades.filter(t => t.id !== id)
+      
+      set({ 
+        trades: updatedTrades,
+        activeTrade: activeTrade?.id === id ? null : activeTrade,
+        isDeleting: false 
+      })
+      
+      // Reapply filters
+      get()._applyFilters()
+      
+      return true
+      
+    } catch (error) {
+      set({ 
+        error: error instanceof Error ? error.message : 'Failed to delete trade',
+        isDeleting: false 
+      })
+      return false
+    }
+  },
+
+  setFilters: (newFilters: Partial<TradeFilters>) => {
+    const currentFilters = get().filters
+    const updatedFilters = { ...currentFilters, ...newFilters }
+    
+    set({ filters: updatedFilters })
+    get()._applyFilters()
+  },
+
+  clearFilters: () => {
+    set({ filters: initialFilters })
+    get()._applyFilters()
+  },
+
+  setActiveTrade: (trade: Trade | null) => {
+    set({ activeTrade: trade })
+  },
+
+  clearError: () => {
+    set({ error: null })
+  },
+
+  // Private helper methods
+  _applyFilters: () => {
+    const { trades, filters } = get()
+    
+    let filtered = [...trades]
+    
+    // Filter by ticker
+    if (filters.ticker) {
+      const ticker = filters.ticker.toLowerCase()
+      filtered = filtered.filter(trade => 
+        trade.ticker.toLowerCase().includes(ticker)
+      )
+    }
+    
+    // Filter by type
+    if (filters.type && filters.type !== 'all') {
+      filtered = filtered.filter(trade => trade.type === filters.type)
+    }
+    
+    // Filter by outcome
+    if (filters.outcome && filters.outcome !== 'all') {
+      filtered = filtered.filter(trade => trade.outcome === filters.outcome)
+    }
+    
+    // Filter by date range
+    if (filters.dateFrom) {
+      const fromDate = new Date(filters.dateFrom)
+      filtered = filtered.filter(trade => 
+        new Date(trade.entryDate) >= fromDate
+      )
+    }
+    
+    if (filters.dateTo) {
+      const toDate = new Date(filters.dateTo)
+      filtered = filtered.filter(trade => 
+        new Date(trade.entryDate) <= toDate
+      )
+    }
+    
+    // Filter by thesis
+    if (filters.thesisId) {
+      filtered = filtered.filter(trade => trade.linkedThesisId === filters.thesisId)
+    }
+    
+    // Sort by entry date (newest first)
+    filtered.sort((a, b) => 
+      new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime()
+    )
+    
+    set({ filteredTrades: filtered })
+  },
+
+  _handleApiError: (response: ApiResponse<any>) => {
+    const errorMessage = ApiError.getMessage(response)
+    set({ 
+      error: errorMessage,
+      isLoading: false,
+      isLoadingTrade: false,
+      isSaving: false,
+      isDeleting: false 
+    })
+  },
+}))
+
+// =============================================================================
+// SELECTORS (for better performance)
+// =============================================================================
+
+export const useTradeSelectors = () => {
+  const store = useTradeStore()
+  
+  return {
+    // Data selectors
+    trades: store.filteredTrades,
+    allTrades: store.trades,
+    activeTrade: store.activeTrade,
+    tradeCount: store.filteredTrades.length,
+    totalTradeCount: store.trades.length,
+    
+    // Loading selectors
+    isLoading: store.isLoading,
+    isLoadingTrade: store.isLoadingTrade,
+    isSaving: store.isSaving,
+    isDeleting: store.isDeleting,
+    isAnyLoading: store.isLoading || store.isLoadingTrade || store.isSaving || store.isDeleting,
+    
+    // Filter selectors
+    filters: store.filters,
+    hasActiveFilters: Object.values(store.filters).some(value => 
+      value !== undefined && value !== 'all' && value !== ''
+    ),
+    
+    // Error selectors
+    error: store.error,
+    hasError: !!store.error,
+    
+    // Statistics selectors
+    winCount: store.filteredTrades.filter(t => t.outcome === 'win').length,
+    lossCount: store.filteredTrades.filter(t => t.outcome === 'loss').length,
+    breakevenCount: store.filteredTrades.filter(t => t.outcome === 'breakeven').length,
+    completedTradeCount: store.filteredTrades.filter(t => t.outcome).length,
+    winRate: (() => {
+      const completed = store.filteredTrades.filter(t => t.outcome).length
+      if (completed === 0) return 0
+      const wins = store.filteredTrades.filter(t => t.outcome === 'win').length
+      return Math.round((wins / completed) * 100)
+    })(),
+    
+    totalPnL: store.filteredTrades
+      .filter(t => typeof t.profitLoss === 'number')
+      .reduce((sum, t) => sum + (t.profitLoss || 0), 0),
+  }
+}
+
+// =============================================================================
+// UTILITY HOOKS
+// =============================================================================
+
+/**
+ * Hook for trade CRUD operations
+ */
+export const useTradeActions = () => {
+  const store = useTradeStore()
+  
+  return {
+    loadTrades: store.loadTrades,
+    loadTrade: store.loadTrade,
+    saveTrade: store.saveTrade,
+    deleteTrade: store.deleteTrade,
+    setActiveTrade: store.setActiveTrade,
+    clearError: store.clearError,
+  }
+}
+
+/**
+ * Hook for trade filtering
+ */
+export const useTradeFilters = () => {
+  const store = useTradeStore()
+  
+  return {
+    filters: store.filters,
+    setFilters: store.setFilters,
+    clearFilters: store.clearFilters,
+  }
+}

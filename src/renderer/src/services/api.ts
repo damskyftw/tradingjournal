@@ -1,4 +1,4 @@
-import type { Trade, TradeSummary, ApiResponse } from '../../../shared/types'
+import type { Trade, TradeSummary, Thesis, ThesisSummary, ApiResponse } from '../../../shared/types'
 
 /**
  * API service for communicating with the main process
@@ -64,6 +64,68 @@ export class ApiService {
   static async deleteTrade(id: string): Promise<ApiResponse<string>> {
     return window.api.trade.delete(id)
   }
+
+  /**
+   * Saves a thesis to the file system
+   * @param thesis The thesis object to save
+   * @returns Promise resolving to the saved thesis's ID
+   */
+  static async saveThesis(thesis: Thesis): Promise<ApiResponse<string>> {
+    return window.api.thesis.save(thesis)
+  }
+
+  /**
+   * Loads a single thesis by ID
+   * @param id The thesis ID to load
+   * @returns Promise resolving to the thesis data
+   */
+  static async loadThesis(id: string): Promise<ApiResponse<Thesis>> {
+    return window.api.thesis.load(id)
+  }
+
+  /**
+   * Lists all theses as summaries
+   * @returns Promise resolving to array of thesis summaries
+   */
+  static async listTheses(): Promise<ApiResponse<ThesisSummary[]>> {
+    return window.api.thesis.list()
+  }
+
+  /**
+   * Deletes a thesis by ID
+   * @param id The thesis ID to delete
+   * @returns Promise resolving to the deleted thesis's ID
+   */
+  static async deleteThesis(id: string): Promise<ApiResponse<string>> {
+    return window.api.thesis.delete(id)
+  }
+
+  /**
+   * Gets the active thesis for a specific quarter and year
+   * @param year The year to check
+   * @param quarter The quarter to check (Q1, Q2, Q3, Q4)
+   * @returns Promise resolving to the active thesis or null if none exists
+   */
+  static async getActiveThesis(year: number, quarter: string): Promise<ApiResponse<Thesis | null>> {
+    return window.api.thesis.getActive(year, quarter)
+  }
+
+  /**
+   * Gets performance metrics for a specific thesis
+   * @param thesisId The thesis ID to get metrics for
+   * @returns Promise resolving to the thesis performance metrics
+   */
+  static async getThesisMetrics(thesisId: string): Promise<ApiResponse<any>> {
+    return window.api.metrics.getThesisMetrics(thesisId)
+  }
+
+  /**
+   * Gets overall portfolio performance metrics
+   * @returns Promise resolving to the portfolio performance metrics
+   */
+  static async getPortfolioMetrics(): Promise<ApiResponse<any>> {
+    return window.api.metrics.getPortfolioMetrics()
+  }
 }
 
 /**
@@ -81,6 +143,17 @@ export const useApi = () => {
     loadTrade: ApiService.loadTrade,
     listTrades: ApiService.listTrades,
     deleteTrade: ApiService.deleteTrade,
+
+    // Thesis operations
+    saveThesis: ApiService.saveThesis,
+    loadThesis: ApiService.loadThesis,
+    listTheses: ApiService.listTheses,
+    deleteThesis: ApiService.deleteThesis,
+    getActiveThesis: ApiService.getActiveThesis,
+
+    // Performance metrics
+    getThesisMetrics: ApiService.getThesisMetrics,
+    getPortfolioMetrics: ApiService.getPortfolioMetrics,
   }
 }
 

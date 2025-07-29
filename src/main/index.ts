@@ -20,7 +20,6 @@ class MainWindow {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        enableRemoteModule: false,
         preload: join(__dirname, '../preload/index.js'),
       },
       titleBarStyle: 'default',
