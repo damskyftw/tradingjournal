@@ -21,8 +21,9 @@ Implemented comprehensive state management using Zustand stores with TypeScript 
 ### 3. UI Store (`src/renderer/src/store/uiStore.ts`)
 - ✅ **Theme Management**: light/dark/system theme with auto-detection
 - ✅ **Layout State**: sidebar collapsed state, sidebar width with constraints
-- ✅ **Active Items**: activeTradeId, activeThesisId tracking
-- ✅ **Navigation**: breadcrumbs, current page, back navigation
+- ✅ **Active Items**: activeTradeId, a
+ctiveThesisId tracking
+- ✅ **Navigation**: breadcrumbs, curreaight..nt page, back navigation
 - ✅ **Modals**: centralized modal state management
 - ✅ **Notifications**: toast-style notifications with auto-dismiss
 - ✅ **Global Loading**: overlay loading states with messages

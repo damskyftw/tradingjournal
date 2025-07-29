@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.QUARTERS = exports.MARKET_OUTLOOKS = exports.TRADE_TYPES = exports.TRADE_OUTCOMES = exports.formatThesisFilename = exports.formatTradeFilename = exports.createThesisId = exports.createTradeId = exports.isTradeNote = exports.isThesisSummary = exports.isTradeSummary = exports.isThesis = exports.isTrade = exports.validateTradeNote = exports.validateThesis = exports.validateTrade = exports.ApiResponseSchema = exports.ThesisSummarySchema = exports.ThesisSchema = exports.ThesisGoalsSchema = exports.RiskParametersSchema = exports.ThesisStrategiesSchema = exports.ThesisVersionSchema = exports.TradeSummarySchema = exports.TradeSchema = exports.PostTradeNotesSchema = exports.PreTradeNotesSchema = exports.TradeNoteSchema = exports.Quarter = exports.MarketOutlook = exports.TradeOutcome = exports.TradeType = void 0;
-const zod_1 = require("zod");
+var zod_1 = require("zod");
 // =============================================================================
 // BASE TYPES
 // =============================================================================
@@ -68,6 +68,7 @@ exports.TradeSummarySchema = zod_1.z.object({
     type: exports.TradeType,
     outcome: exports.TradeOutcome.optional(),
     profitLoss: zod_1.z.number().optional(),
+    linkedThesisId: zod_1.z.string().uuid().optional(),
     createdAt: zod_1.z.string().datetime(),
     updatedAt: zod_1.z.string().datetime(),
 });
@@ -142,67 +143,67 @@ exports.ApiResponseSchema = zod_1.z.object({
 // =============================================================================
 // VALIDATION UTILITIES
 // =============================================================================
-const validateTrade = (data) => {
+var validateTrade = function (data) {
     return exports.TradeSchema.parse(data);
 };
 exports.validateTrade = validateTrade;
-const validateThesis = (data) => {
+var validateThesis = function (data) {
     return exports.ThesisSchema.parse(data);
 };
 exports.validateThesis = validateThesis;
-const validateTradeNote = (data) => {
+var validateTradeNote = function (data) {
     return exports.TradeNoteSchema.parse(data);
 };
 exports.validateTradeNote = validateTradeNote;
 // =============================================================================
 // TYPE GUARDS
 // =============================================================================
-const isTrade = (data) => {
+var isTrade = function (data) {
     try {
         exports.TradeSchema.parse(data);
         return true;
     }
-    catch {
+    catch (_a) {
         return false;
     }
 };
 exports.isTrade = isTrade;
-const isThesis = (data) => {
+var isThesis = function (data) {
     try {
         exports.ThesisSchema.parse(data);
         return true;
     }
-    catch {
+    catch (_a) {
         return false;
     }
 };
 exports.isThesis = isThesis;
-const isTradeSummary = (data) => {
+var isTradeSummary = function (data) {
     try {
         exports.TradeSummarySchema.parse(data);
         return true;
     }
-    catch {
+    catch (_a) {
         return false;
     }
 };
 exports.isTradeSummary = isTradeSummary;
-const isThesisSummary = (data) => {
+var isThesisSummary = function (data) {
     try {
         exports.ThesisSummarySchema.parse(data);
         return true;
     }
-    catch {
+    catch (_a) {
         return false;
     }
 };
 exports.isThesisSummary = isThesisSummary;
-const isTradeNote = (data) => {
+var isTradeNote = function (data) {
     try {
         exports.TradeNoteSchema.parse(data);
         return true;
     }
-    catch {
+    catch (_a) {
         return false;
     }
 };
@@ -210,24 +211,24 @@ exports.isTradeNote = isTradeNote;
 // =============================================================================
 // UTILITY FUNCTIONS
 // =============================================================================
-const createTradeId = () => {
+var createTradeId = function () {
     return crypto.randomUUID();
 };
 exports.createTradeId = createTradeId;
-const createThesisId = () => {
+var createThesisId = function () {
     return crypto.randomUUID();
 };
 exports.createThesisId = createThesisId;
-const formatTradeFilename = (trade) => {
-    const date = new Date(trade.entryDate);
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    return `${trade.ticker}_${year}${month}${day}_${trade.id}.json`;
+var formatTradeFilename = function (trade) {
+    var date = new Date(trade.entryDate);
+    var year = date.getUTCFullYear();
+    var month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    var day = String(date.getUTCDate()).padStart(2, '0');
+    return "".concat(trade.ticker, "_").concat(year).concat(month).concat(day, "_").concat(trade.id, ".json");
 };
 exports.formatTradeFilename = formatTradeFilename;
-const formatThesisFilename = (thesis) => {
-    return `${thesis.year}_${thesis.quarter}_${thesis.id}.json`;
+var formatThesisFilename = function (thesis) {
+    return "".concat(thesis.year, "_").concat(thesis.quarter, "_").concat(thesis.id, ".json");
 };
 exports.formatThesisFilename = formatThesisFilename;
 // =============================================================================

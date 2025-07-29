@@ -5,9 +5,12 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
-import { Plus, TrendingUp, TrendingDown, Filter, Search, MoreHorizontal, ChevronDown, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react'
+import { Plus, TrendingUp, TrendingDown, Filter, Search, MoreHorizontal, ChevronDown, ChevronLeft, ChevronRight, ArrowUpDown, Download } from 'lucide-react'
 import { useTradeSelectors, useTradeActions, useTradeFilters } from '../store'
-import type { TradeSummary } from '../../../shared/types'
+import { SearchBar } from '../components/SearchBar'
+import { SearchHighlight } from '../components/SearchHighlight'
+import { exportSearchResults } from '../utils/searchExport'
+import type { TradeSummary, Trade } from '../../../shared/types'
 
 type SortField = 'entryDate' | 'ticker' | 'outcome' | 'profitLoss'
 type SortDirection = 'asc' | 'desc'
@@ -22,6 +25,8 @@ export function TradeList() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [currentPage, setCurrentPage] = useState(1)
   const [searchTerm, setSearchTerm] = useState('')
+  const [searchResults, setSearchResults] = useState<Trade[]>([])
+  const [isSearchActive, setIsSearchActive] = useState(false)
   
   const ITEMS_PER_PAGE = 20
 
@@ -29,15 +34,36 @@ export function TradeList() {
     loadTrades()
   }, [loadTrades])
   
-  // Update filters when search term changes
-  useEffect(() => {
-    setFilters({ ticker: searchTerm || undefined })
-  }, [searchTerm, setFilters])
-
-  // Reset to first page when filters change
+  // Reset to first page when filters or search changes
   useEffect(() => {
     setCurrentPage(1)
-  }, [filters])
+  }, [filters, isSearchActive])
+
+  // Handle search results
+  const handleSearchResults = (results: Trade[]) => {
+    setSearchResults(results)
+    setIsSearchActive(true)
+    setCurrentPage(1)
+  }
+
+  const handleClearSearch = () => {
+    setSearchResults([])
+    setIsSearchActive(false)
+    setSearchTerm('')
+    setCurrentPage(1)
+  }
+
+  // Handle search result export
+  const handleExportResults = (format: 'json' | 'csv' | 'markdown' = 'json') => {
+    if (!isSearchActive) return
+    
+    exportSearchResults(
+      searchTerm,
+      filters,
+      searchResults,
+      format
+    )
+  }
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -48,8 +74,11 @@ export function TradeList() {
     }
   }
 
-  // Apply sorting to filtered trades
-  const sortedTrades = [...tradeSelectors.trades].sort((a, b) => {
+  // Use search results if search is active, otherwise use filtered trades
+  const displayTrades = isSearchActive ? searchResults : tradeSelectors.trades
+
+  // Apply sorting to display trades
+  const sortedTrades = [...displayTrades].sort((a, b) => {
     let aValue: any = a[sortField]
     let bValue: any = b[sortField]
     
@@ -199,28 +228,22 @@ export function TradeList() {
         </Card>
       </div>
 
-      {/* Filters and Search */}
+      {/* Search and Filters */}
       <Card>
         <CardContent className="p-4">
           <div className="space-y-4">
             <div className="flex gap-4 items-center">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="Search by ticker..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+              <div className="flex-1">
+                <SearchBar
+                  trades={tradeSelectors.allTrades || []}
+                  onSearchResults={handleSearchResults}
+                  onClearSearch={handleClearSearch}
                 />
               </div>
-              <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
-                <Filter className="mr-2 h-4 w-4" />
-                Filters
-                <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-              </Button>
-              {tradeSelectors.hasActiveFilters && (
-                <Button variant="outline" onClick={clearFilters}>
-                  Clear Filters
+              {isSearchActive && (
+                <Button variant="outline" onClick={() => handleExportResults('json')}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export Results
                 </Button>
               )}
             </div>
@@ -310,7 +333,7 @@ export function TradeList() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>
-                  {tradeSelectors.hasActiveFilters ? 'Filtered Trades' : 'All Trades'} ({sortedTrades.length})
+                  {isSearchActive ? 'Search Results' : tradeSelectors.hasActiveFilters ? 'Filtered Trades' : 'All Trades'} ({sortedTrades.length})
                 </CardTitle>
                 <CardDescription>Click on any trade to view details</CardDescription>
               </div>
@@ -377,7 +400,10 @@ export function TradeList() {
                           to={`/trades/${trade.id}`}
                           className="font-medium text-blue-600 hover:text-blue-800"
                         >
-                          {trade.ticker}
+                          <SearchHighlight 
+                            text={trade.ticker} 
+                            searchTerm={isSearchActive ? searchTerm : ''} 
+                          />
                         </Link>
                       </td>
                       <td className="p-4">

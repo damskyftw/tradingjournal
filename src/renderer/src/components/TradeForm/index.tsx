@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from 'react-router-dom'
 import { useDebouncedCallback } from 'use-debounce'
-import { type Trade } from '../../../../shared/types'
+import { type Trade, TradeSchema } from '../../../../shared/types/index.ts'
 import { useTradeActions, useUIStore } from '../../store'
 import { TradeFormSteps } from '../trade/TradeFormSteps'
 import { BasicInfoStep } from './BasicInfoStep'
@@ -81,6 +81,7 @@ export function TradeForm({ trade, onSave, onCancel }: TradeFormProps) {
   }
 
   const form = useForm<Trade>({
+    resolver: zodResolver(TradeSchema),
     defaultValues,
     mode: 'onChange',
   })

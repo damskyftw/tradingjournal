@@ -120,6 +120,7 @@ export declare const TradeSummarySchema: z.ZodObject<{
         breakeven: "breakeven";
     }>>;
     profitLoss: z.ZodOptional<z.ZodNumber>;
+    linkedThesisId: z.ZodOptional<z.ZodString>;
     createdAt: z.ZodString;
     updatedAt: z.ZodString;
 }, z.core.$strip>;
