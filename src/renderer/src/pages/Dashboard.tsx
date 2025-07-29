@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -103,19 +103,25 @@ export function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
-      // Load trades via store (this handles loading state)
-      await loadTrades()
+      // Load data in parallel to prevent flicker
+      const [tradesResult, thesesResult] = await Promise.allSettled([
+        loadTrades(),
+        ApiService.listTheses()
+      ])
 
-      // Load theses separately (not yet in store)
-      const thesesResponse = await ApiService.listTheses()
-      if (thesesResponse.success) {
-        setTheses(thesesResponse.data || [])
+      // Handle theses data
+      if (thesesResult.status === 'fulfilled' && thesesResult.value.success) {
+        setTheses(thesesResult.value.data || [])
       }
 
-      // Generate chart data using store data
+      // Update chart data and timestamp in a single batch
       const chartDataPoints = generateChartData(tradeSelectors.allTrades, dateRange)
-      setChartData(chartDataPoints)
-      setLastUpdated(new Date())
+      
+      // Use React's batching to prevent multiple re-renders
+      React.startTransition(() => {
+        setChartData(chartDataPoints)
+        setLastUpdated(new Date())
+      })
 
     } catch (err) {
       console.error('Failed to load dashboard data:', err)
@@ -218,15 +224,98 @@ export function Dashboard() {
     { name: 'Losses', value: stats.completedTrades - Math.round(stats.winRate * stats.completedTrades), color: '#ef4444' }
   ] : []
 
+  // Loading skeleton component
+  const WidgetSkeleton = ({ className = "" }: { className?: string }) => (
+    <Card className={`h-full ${className}`}>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 bg-slate-200 rounded animate-pulse" />
+          <div className="w-24 h-4 bg-slate-200 rounded animate-pulse" />
+        </div>
+        <div className="w-48 h-3 bg-slate-100 rounded animate-pulse" />
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          <div className="w-full h-4 bg-slate-200 rounded animate-pulse" />
+          <div className="w-3/4 h-4 bg-slate-200 rounded animate-pulse" />
+          <div className="w-1/2 h-4 bg-slate-200 rounded animate-pulse" />
+        </div>
+      </CardContent>
+    </Card>
+  )
+
   if (tradeSelectors.isLoading) {
     return (
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-slate-400" />
-            <p className="text-slate-600">Loading analytics...</p>
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
+            <p className="text-slate-600">Loading your trading performance...</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-32 h-10 bg-slate-200 rounded animate-pulse" />
+            <div className="w-20 h-10 bg-slate-200 rounded animate-pulse" />
           </div>
         </div>
+
+        {/* Dashboard Widgets Grid - Loading Skeletons */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-4">
+            <WidgetSkeleton />
+          </div>
+          <div className="lg:col-span-4">
+            <WidgetSkeleton />
+          </div>
+          <div className="lg:col-span-4">
+            <WidgetSkeleton />
+          </div>
+        </div>
+
+        {/* Goal Progress Skeleton */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 bg-slate-200 rounded animate-pulse" />
+              <div className="w-32 h-5 bg-slate-200 rounded animate-pulse" />
+            </div>
+            <div className="w-64 h-4 bg-slate-100 rounded animate-pulse" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i}>
+                  <div className="flex justify-between mb-2">
+                    <div className="w-20 h-4 bg-slate-200 rounded animate-pulse" />
+                    <div className="w-16 h-4 bg-slate-200 rounded animate-pulse" />
+                  </div>
+                  <div className="w-full h-2 bg-slate-200 rounded animate-pulse" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Stats Skeleton */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 bg-slate-200 rounded animate-pulse" />
+              <div className="w-24 h-5 bg-slate-200 rounded animate-pulse" />
+            </div>
+            <div className="w-48 h-4 bg-slate-100 rounded animate-pulse" />
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="text-center space-y-2">
+                  <div className="w-16 h-8 bg-slate-200 mx-auto rounded animate-pulse" />
+                  <div className="w-12 h-3 bg-slate-100 mx-auto rounded animate-pulse" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
