@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { Button } from './ui/button'
 import { TrendingUp, FileText, BarChart3, Settings, Home } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { useGlobalKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -10,6 +11,9 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation()
+  
+  // Enable global keyboard shortcuts
+  useGlobalKeyboardShortcuts()
   
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long',

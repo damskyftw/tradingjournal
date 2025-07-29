@@ -436,3 +436,37 @@ Before starting development, ensure:
 4. Begin implementing features phase by phase
 
 Remember: Claude Code is your pair programmer, not an autonomous coder. Always review generated code and maintain healthy skepticism about architectural decisions.
+
+## Design System
+
+### Colors
+- Primary: #3B82F6 (Blue)
+- Success/Profit: #10B981 (Green)
+- Danger/Loss: #EF4444 (Red)
+- Neutral: #6B7280 (Gray)
+- Background: #FAFAFA (Light) / #0F172A (Dark)
+- Card: #FFFFFF (Light) / #1E293B (Dark)
+
+### Typography
+- Font: Inter or system-ui
+- Headings: Bold, 1.5-2x size
+- Body: Regular, base size
+- Captions: 0.875x size, muted color
+
+### Spacing
+- Base unit: 4px (Tailwind default)
+- Component padding: 16-24px
+- Card spacing: 24-32px
+- Section margins: 48-64px
+
+### Animations
+- Transitions: 200ms ease
+- Hover states: Subtle scale/shadow
+- Loading: Skeleton screens
+- Success/Error: Bounce/shake
+
+### Components Style
+- Cards: Subtle shadow, rounded corners (8px)
+- Buttons: Rounded (6px), clear hover states
+- Inputs: Border on focus, proper height (40px+)
+- Tables: Alternating rows, hover highlights

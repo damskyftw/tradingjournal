@@ -31,6 +31,10 @@ export class FileService {
     this.backupsDir = path.join(this.dataDir, 'backups')
   }
 
+  private get screenshotsDir(): string {
+    return path.join(this.dataDir, 'screenshots')
+  }
+
   /**
    * Ensures all required data directories exist
    */
@@ -43,6 +47,7 @@ export class FileService {
       await fs.mkdir(this.tradesDir, { recursive: true })
       await fs.mkdir(this.thesesDir, { recursive: true })
       await fs.mkdir(this.backupsDir, { recursive: true })
+      await fs.mkdir(this.screenshotsDir, { recursive: true })
 
       // Create current year directory for trades  
       const currentYear = new Date().getFullYear()
@@ -838,6 +843,225 @@ export class FileService {
       return files.length > 0 ? files[0] : null
     } catch (error) {
       return null
+    }
+  }
+
+  /**
+   * Saves a screenshot image to the screenshots directory
+   */
+  async saveScreenshot(params: {
+    filename: string
+    data: string // base64 encoded image data
+    tradeId?: string
+  }): Promise<ApiResponse<{ path: string; thumbnailPath?: string }>> {
+    try {
+      // Ensure screenshots directory exists
+      await fs.mkdir(this.screenshotsDir, { recursive: true })
+
+      // Generate unique filename with timestamp
+      const timestamp = Date.now()
+      const ext = path.extname(params.filename) || '.png'
+      const baseName = path.basename(params.filename, ext)
+      const uniqueFilename = `${timestamp}_${baseName}${ext}`
+      const filePath = path.join(this.screenshotsDir, uniqueFilename)
+
+      // Decode base64 and save file
+      const buffer = Buffer.from(params.data, 'base64')
+      await fs.writeFile(filePath, buffer)
+
+      // Generate thumbnail for performance (if it's an image)
+      let thumbnailPath: string | undefined
+      try {
+        const sharp = require('sharp')
+        const thumbName = `thumb_${uniqueFilename}`
+        thumbnailPath = path.join(this.screenshotsDir, thumbName)
+        
+        await sharp(buffer)
+          .resize(200, 200, { 
+            fit: 'cover',
+            position: 'center'
+          })
+          .jpeg({ quality: 80 })
+          .toFile(thumbnailPath)
+      } catch (error) {
+        // If sharp is not available or thumbnail creation fails, continue without thumbnail
+        console.warn('Failed to create thumbnail:', error)
+        thumbnailPath = undefined
+      }
+
+      return {
+        success: true,
+        data: {
+          path: filePath,
+          thumbnailPath
+        },
+        timestamp: new Date().toISOString(),
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to save screenshot: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  }
+
+  /**
+   * Deletes a screenshot by path
+   */
+  async deleteScreenshot(params: { path: string }): Promise<ApiResponse<void>> {
+    try {
+      // Validate path is within screenshots directory for security
+      const normalizedPath = path.normalize(params.path)
+      const normalizedScreenshotsDir = path.normalize(this.screenshotsDir)
+      
+      if (!normalizedPath.startsWith(normalizedScreenshotsDir)) {
+        return {
+          success: false,
+          error: 'Invalid screenshot path',
+          timestamp: new Date().toISOString(),
+        }
+      }
+
+      // Delete main file
+      try {
+        await fs.unlink(params.path)
+      } catch (error) {
+        // File might not exist, which is okay
+      }
+
+      // Delete thumbnail if it exists
+      const filename = path.basename(params.path)
+      const thumbnailPath = path.join(this.screenshotsDir, `thumb_${filename}`)
+      try {
+        await fs.unlink(thumbnailPath)
+      } catch (error) {
+        // Thumbnail might not exist, which is okay
+      }
+
+      return {
+        success: true,
+        timestamp: new Date().toISOString(),
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to delete screenshot: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  }
+
+  /**
+   * Lists all screenshots in the directory
+   */
+  async listScreenshots(): Promise<ApiResponse<Array<{ path: string; name: string; size: number; created: string }>>> {
+    try {
+      await fs.mkdir(this.screenshotsDir, { recursive: true })
+
+      const files = await fs.readdir(this.screenshotsDir)
+      const screenshots = []
+
+      for (const file of files) {
+        // Skip thumbnail files
+        if (file.startsWith('thumb_')) continue
+
+        const filePath = path.join(this.screenshotsDir, file)
+        try {
+          const stats = await fs.stat(filePath)
+          screenshots.push({
+            path: filePath,
+            name: file,
+            size: stats.size,
+            created: stats.birthtime.toISOString()
+          })
+        } catch (error) {
+          // Skip files that can't be read
+          continue
+        }
+      }
+
+      // Sort by creation date (newest first)
+      screenshots.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())
+
+      return {
+        success: true,
+        data: screenshots,
+        timestamp: new Date().toISOString(),
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to list screenshots: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  }
+
+  /**
+   * Cleans up unused screenshots that are not referenced by any trades
+   */
+  async cleanupUnusedScreenshots(): Promise<ApiResponse<{ deletedCount: number; deletedFiles: string[] }>> {
+    try {
+      // Get all screenshots
+      const screenshotsResult = await this.listScreenshots()
+      if (!screenshotsResult.success || !screenshotsResult.data) {
+        return {
+          success: false,
+          error: 'Failed to list screenshots for cleanup',
+          timestamp: new Date().toISOString(),
+        }
+      }
+
+      // Get all trades
+      const tradesResult = await this.listTrades()
+      if (!tradesResult.success || !tradesResult.data) {
+        return {
+          success: false,
+          error: 'Failed to list trades for cleanup',
+          timestamp: new Date().toISOString(),
+        }
+      }
+
+      // Collect all screenshot paths referenced by trades
+      const referencedPaths = new Set<string>()
+      for (const tradeSummary of tradesResult.data) {
+        const tradeResult = await this.loadTrade(tradeSummary.id)
+        if (tradeResult.success && tradeResult.data) {
+          for (const screenshotPath of tradeResult.data.screenshots) {
+            referencedPaths.add(screenshotPath)
+          }
+        }
+      }
+
+      // Find unused screenshots
+      const unusedScreenshots = screenshotsResult.data.filter(
+        screenshot => !referencedPaths.has(screenshot.path)
+      )
+
+      // Delete unused screenshots
+      const deletedFiles: string[] = []
+      for (const screenshot of unusedScreenshots) {
+        const deleteResult = await this.deleteScreenshot({ path: screenshot.path })
+        if (deleteResult.success) {
+          deletedFiles.push(screenshot.name)
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          deletedCount: deletedFiles.length,
+          deletedFiles
+        },
+        timestamp: new Date().toISOString(),
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to cleanup unused screenshots: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
     }
   }
 }

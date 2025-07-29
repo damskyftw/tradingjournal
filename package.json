@@ -1,10 +1,16 @@
 {
   "name": "trading-journal",
   "version": "1.0.0",
-  "description": "A local desktop trading journal application",
+  "description": "A local desktop trading journal application for systematic trade documentation and performance analysis",
   "main": "dist/main/index.js",
-  "author": "",
-  "license": "ISC",
+  "author": "Trading Journal Team",
+  "license": "MIT",
+  "homepage": "https://github.com/tradingjournal/app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tradingjournal/app.git"
+  },
+  "keywords": ["trading", "journal", "finance", "analytics", "desktop", "electron"],
   "scripts": {
     "dev": "concurrently \"npm run dev:vite\" \"wait-on http://localhost:5173 && npm run dev:electron\"",
     "dev:vite": "vite src/renderer",
@@ -25,11 +31,14 @@
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-select": "^2.2.5",
     "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-switch": "^1.2.5",
     "@tailwindcss/postcss": "^4.1.11",
+    "archiver": "^7.0.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "electron": "^37.2.4",
+    "extract-zip": "^2.0.1",
     "fuse.js": "^7.1.0",
     "glob": "^11.0.3",
     "lucide-react": "^0.530.0",
@@ -37,7 +46,10 @@
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.61.1",
     "react-router-dom": "^7.7.1",
+    "react-window": "^1.8.11",
+    "react-window-infinite-loader": "^1.0.10",
     "recharts": "^3.1.0",
+    "sharp": "^0.34.3",
     "tailwind-merge": "^3.3.1",
     "use-debounce": "^10.0.5",
     "zod": "^4.0.10",
@@ -81,6 +93,42 @@
     "files": [
       "dist/**/*",
       "node_modules/**/*"
-    ]
+    ],
+    "mac": {
+      "category": "public.app-category.finance",
+      "icon": "assets/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ]
+    },
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "ia32"]
+        }
+      ]
+    },
+    "linux": {
+      "icon": "assets/icon.png",
+      "category": "Office",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }
