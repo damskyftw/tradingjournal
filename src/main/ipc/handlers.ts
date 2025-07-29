@@ -1,7 +1,8 @@
-import { ipcMain } from 'electron'
+import { ipcMain, dialog } from 'electron'
 import path from 'path'
 import os from 'os'
 import { FileService } from '../services/FileService'
+import { BackupService } from '../services/BackupService'
 import type { Trade, Thesis, ApiResponse, TradeSummary, ThesisSummary } from '@shared/types'
 
 // Initialize FileService with data directory in user's home folder
@@ -26,6 +27,7 @@ const getDataDirectory = (): string => {
 }
 
 const fileService = new FileService(getDataDirectory())
+const backupService = new BackupService(getDataDirectory())
 
 /**
  * Sets up all IPC handlers for trade operations
@@ -280,6 +282,186 @@ export const setupIpcHandlers = (): void => {
       return {
         success: false,
         error: `Failed to get app info: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  })
+
+  // Screenshot handlers
+  ipcMain.handle('screenshot:save', async (event, params: unknown): Promise<ApiResponse<{ path: string; thumbnailPath?: string }>> => {
+    try {
+      if (!params || typeof params !== 'object') {
+        return {
+          success: false,
+          error: 'Invalid screenshot parameters',
+          timestamp: new Date().toISOString(),
+        }
+      }
+
+      return await fileService.saveScreenshot(params as any)
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to save screenshot: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  })
+
+  ipcMain.handle('screenshot:delete', async (event, params: unknown): Promise<ApiResponse<void>> => {
+    try {
+      if (!params || typeof params !== 'object') {
+        return {
+          success: false,
+          error: 'Invalid screenshot parameters',
+          timestamp: new Date().toISOString(),
+        }
+      }
+
+      return await fileService.deleteScreenshot(params as any)
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to delete screenshot: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  })
+
+  ipcMain.handle('screenshot:list', async (): Promise<ApiResponse<Array<{ path: string; name: string; size: number; created: string }>>> => {
+    try {
+      return await fileService.listScreenshots()
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to list screenshots: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  })
+
+  // Backup handlers
+  ipcMain.handle('backup:create', async (event, onProgress?: (progress: any) => void): Promise<ApiResponse<{ backupPath: string; metadata: any }>> => {
+    try {
+      return await backupService.createBackup(onProgress)
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to create backup: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  })
+
+  ipcMain.handle('backup:list', async (): Promise<ApiResponse<any[]>> => {
+    try {
+      return await backupService.listBackups()
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to list backups: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  })
+
+  ipcMain.handle('backup:restore', async (event, backupId: unknown, onProgress?: (progress: any) => void): Promise<ApiResponse<void>> => {
+    try {
+      if (!backupId || typeof backupId !== 'string') {
+        return {
+          success: false,
+          error: 'Invalid backup ID',
+          timestamp: new Date().toISOString(),
+        }
+      }
+
+      return await backupService.restoreBackup(backupId, onProgress)
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to restore backup: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  })
+
+  ipcMain.handle('backup:delete', async (event, backupId: unknown): Promise<ApiResponse<void>> => {
+    try {
+      if (!backupId || typeof backupId !== 'string') {
+        return {
+          success: false,
+          error: 'Invalid backup ID',
+          timestamp: new Date().toISOString(),
+        }
+      }
+
+      return await backupService.deleteBackup(backupId)
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to delete backup: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  })
+
+  ipcMain.handle('backup:validate', async (event, backupId: unknown): Promise<ApiResponse<{ isValid: boolean; errors: string[] }>> => {
+    try {
+      if (!backupId || typeof backupId !== 'string') {
+        return {
+          success: false,
+          error: 'Invalid backup ID',
+          timestamp: new Date().toISOString(),
+        }
+      }
+
+      return await backupService.validateBackup(backupId)
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to validate backup: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  })
+
+  ipcMain.handle('backup:size', async (): Promise<ApiResponse<{ totalSize: number; backupCount: number }>> => {
+    try {
+      return await backupService.getBackupsSize()
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to get backup size: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString(),
+      }
+    }
+  })
+
+  // File system handlers
+  ipcMain.handle('file:selectDirectory', async (): Promise<ApiResponse<{ path: string }>> => {
+    try {
+      const result = await dialog.showOpenDialog({
+        properties: ['openDirectory'],
+        title: 'Select Backup Directory'
+      })
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return {
+          success: false,
+          error: 'Directory selection canceled',
+          timestamp: new Date().toISOString(),
+        }
+      }
+
+      return {
+        success: true,
+        data: { path: result.filePaths[0] },
+        timestamp: new Date().toISOString(),
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to select directory: ${error instanceof Error ? error.message : 'Unknown error'}`,
         timestamp: new Date().toISOString(),
       }
     }

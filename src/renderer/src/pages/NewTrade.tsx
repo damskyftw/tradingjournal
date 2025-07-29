@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { TradeForm } from '../components/TradeForm'
+import { CryptoTradeForm } from '../components/CryptoTradeForm'
 import type { Trade } from '../../../shared/types'
 
 export function NewTrade() {
@@ -15,7 +15,7 @@ export function NewTrade() {
   }
 
   return (
-    <TradeForm 
+    <CryptoTradeForm 
       onSave={handleSave}
       onCancel={handleCancel}
     />

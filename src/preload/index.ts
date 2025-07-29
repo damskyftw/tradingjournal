@@ -60,6 +60,39 @@ const api = {
     getPortfolioMetrics: (): Promise<ApiResponse<any>> => 
       ipcRenderer.invoke('metrics:portfolio'),
   },
+
+  // Screenshot operations
+  saveScreenshot: (params: { filename: string; data: string; tradeId?: string }): Promise<ApiResponse<{ path: string; thumbnailPath?: string }>> =>
+    ipcRenderer.invoke('screenshot:save', params),
+  
+  deleteScreenshot: (params: { path: string }): Promise<ApiResponse<void>> =>
+    ipcRenderer.invoke('screenshot:delete', params),
+  
+  listScreenshots: (): Promise<ApiResponse<Array<{ path: string; name: string; size: number; created: string }>>> =>
+    ipcRenderer.invoke('screenshot:list'),
+
+  // Backup operations
+  createBackup: (onProgress?: (progress: any) => void): Promise<ApiResponse<{ backupPath: string; metadata: any }>> =>
+    ipcRenderer.invoke('backup:create', onProgress),
+  
+  listBackups: (): Promise<ApiResponse<any[]>> =>
+    ipcRenderer.invoke('backup:list'),
+  
+  restoreBackup: (backupId: string, onProgress?: (progress: any) => void): Promise<ApiResponse<void>> =>
+    ipcRenderer.invoke('backup:restore', backupId, onProgress),
+  
+  deleteBackup: (backupId: string): Promise<ApiResponse<void>> =>
+    ipcRenderer.invoke('backup:delete', backupId),
+  
+  validateBackup: (backupId: string): Promise<ApiResponse<{ isValid: boolean; errors: string[] }>> =>
+    ipcRenderer.invoke('backup:validate', backupId),
+  
+  getBackupsSize: (): Promise<ApiResponse<{ totalSize: number; backupCount: number }>> =>
+    ipcRenderer.invoke('backup:size'),
+
+  // File system
+  selectDirectory: (): Promise<ApiResponse<{ path: string }>> =>
+    ipcRenderer.invoke('file:selectDirectory'),
 }
 
 // Expose the API to the renderer process
