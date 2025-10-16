@@ -3,8 +3,189 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* STAGE9 Professional Color System - Light Mode */
+    --background: linear-gradient(135deg, #FAFAFA 0%, #F3F4F6 100%);
+    --background-solid: #FAFAFA;
+    --card-bg: rgba(255, 255, 255, 0.9);
+    --card-border: rgba(0, 0, 0, 0.05);
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --card-shadow-hover: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    
+    /* Brand Colors */
+    --primary: #3B82F6;
+    --primary-rgb: 59, 130, 246;
+    --primary-dark: #2563eb;
+    --primary-light: #60a5fa;
+    
+    /* Profit/Loss with Glows */
+    --success: #10B981;
+    --success-rgb: 16, 185, 129;
+    --success-glow: 0 0 20px rgba(16, 185, 129, 0.4);
+    --success-pulse: 0 0 0 0 rgba(16, 185, 129, 0.4);
+    
+    --danger: #EF4444;
+    --danger-rgb: 239, 68, 68;
+    --danger-glow: 0 0 20px rgba(239, 68, 68, 0.3);
+    --danger-pulse: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    
+    /* Text Colors */
+    --text-primary: #1F2937;
+    --text-secondary: #6B7280;
+    --text-muted: #9CA3AF;
+    
+    /* Glass Morphism */
+    --glass-bg: rgba(255, 255, 255, 0.25);
+    --glass-border: rgba(255, 255, 255, 0.3);
+    --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
+    --gradient-success: linear-gradient(135deg, #10B981 0%, #059669 100%);
+    --gradient-danger: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+    --gradient-card: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%);
+  }
+
+  .dark {
+    /* STAGE9 Professional Color System - Dark Mode */
+    --background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    --background-solid: #0F172A;
+    --card-bg: rgba(30, 41, 59, 0.9);
+    --card-border: rgba(255, 255, 255, 0.1);
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+    --card-shadow-hover: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+    
+    /* Brand Colors - Enhanced for Dark */
+    --primary: #60A5FA;
+    --primary-rgb: 96, 165, 250;
+    --primary-dark: #3B82F6;
+    --primary-light: #93C5FD;
+    
+    /* Profit/Loss with Neon Glows */
+    --success: #10B981;
+    --success-rgb: 16, 185, 129;
+    --success-glow: 0 0 30px rgba(16, 185, 129, 0.6);
+    --success-pulse: 0 0 0 0 rgba(16, 185, 129, 0.6);
+    
+    --danger: #DC2626;
+    --danger-rgb: 220, 38, 38;
+    --danger-glow: 0 0 25px rgba(220, 38, 38, 0.5);
+    --danger-pulse: 0 0 0 0 rgba(220, 38, 38, 0.5);
+    
+    /* Text Colors */
+    --text-primary: #F8FAFC;
+    --text-secondary: #CBD5E1;
+    --text-muted: #64748B;
+    
+    /* Glass Morphism - Dark */
+    --glass-bg: rgba(30, 41, 59, 0.3);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+    
+    /* Gradients - Dark */
+    --gradient-primary: linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%);
+    --gradient-success: linear-gradient(135deg, #10B981 0%, #047857 100%);
+    --gradient-danger: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%);
+    --gradient-card: linear-gradient(135deg, rgba(30,41,59,0.9) 0%, rgba(30,41,59,0.7) 100%);
+  }
+
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
+    background: var(--background);
+    color: var(--text-primary);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Enhanced focus styles for accessibility */
+  *:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    transition: outline-color 0.2s ease;
+  }
+}
+
+@layer components {
+  /* Premium Card Styles */
+  .card-premium {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    box-shadow: var(--card-shadow);
+    backdrop-filter: blur(8px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .card-premium:hover {
+    box-shadow: var(--card-shadow-hover);
+    transform: translateY(-2px);
+  }
+  
+  /* Glass Morphism */
+  .glass {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    backdrop-filter: blur(16px);
+  }
+  
+  /* Profit/Loss Glows */
+  .profit-glow {
+    color: var(--success);
+    text-shadow: var(--success-glow);
+    transition: all 0.3s ease;
+  }
+  
+  .profit-glow:hover {
+    filter: drop-shadow(var(--success-glow));
+  }
+  
+  .loss-glow {
+    color: var(--danger);
+    text-shadow: var(--danger-glow);
+    transition: all 0.3s ease;
+  }
+  
+  .loss-glow:hover {
+    filter: drop-shadow(var(--danger-glow));
+  }
+  
+  /* Gradient Backgrounds */
+  .bg-gradient-primary {
+    background: var(--gradient-primary);
+  }
+  
+  .bg-gradient-success {
+    background: var(--gradient-success);
+  }
+  
+  .bg-gradient-danger {
+    background: var(--gradient-danger);
+  }
+  
+  /* Pulse Animations */
+  .profit-pulse {
+    animation: profit-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  .loss-pulse {
+    animation: loss-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  @keyframes profit-pulse {
+    0%, 100% {
+      box-shadow: var(--success-pulse);
+    }
+    50% {
+      box-shadow: 0 0 0 10px rgba(var(--success-rgb), 0);
+    }
+  }
+  
+  @keyframes loss-pulse {
+    0%, 100% {
+      box-shadow: var(--danger-pulse);
+    }
+    50% {
+      box-shadow: 0 0 0 10px rgba(var(--danger-rgb), 0);
+    }
   }
 }

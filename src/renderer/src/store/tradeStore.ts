@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Trade, TradeSummary, ApiResponse } from '../../../shared/types'
+import type { Trade, ApiResponse } from '../../../shared/types'
 import { ApiService, ApiError } from '../services/api'
 
 // =============================================================================
@@ -17,7 +17,7 @@ export interface TradeFilters {
 
 export interface TradeState {
   // Data
-  trades: TradeSummary[]
+  trades: Trade[]
   activeTrade: Trade | null
   
   // Loading states
@@ -28,7 +28,7 @@ export interface TradeState {
   
   // Filter state
   filters: TradeFilters
-  filteredTrades: TradeSummary[]
+  filteredTrades: Trade[]
   
   // Error state
   error: string | null
@@ -78,16 +78,29 @@ export const useTradeStore = create<TradeState>((set, get) => ({
     set({ isLoading: true, error: null })
     
     try {
-      const response = await ApiService.listTrades()
+      // First get the list of trade summaries
+      const listResponse = await ApiService.listTrades()
       
-      if (ApiError.isError(response)) {
-        get()._handleApiError(response)
+      if (ApiError.isError(listResponse)) {
+        get()._handleApiError(listResponse)
         return
       }
       
-      const trades = response.data || []
+      const tradeSummaries = listResponse.data || []
+      
+      // Then load each trade individually to get full data
+      const fullTrades: Trade[] = []
+      
+      for (const summary of tradeSummaries) {
+        const tradeResponse = await ApiService.loadTrade(summary.id)
+        
+        if (!ApiError.isError(tradeResponse) && tradeResponse.data) {
+          fullTrades.push(tradeResponse.data)
+        }
+      }
+      
       set({ 
-        trades,
+        trades: fullTrades,
         isLoading: false 
       })
       
@@ -127,6 +140,7 @@ export const useTradeStore = create<TradeState>((set, get) => ({
   },
 
   saveTrade: async (trade: Trade): Promise<string | null> => {
+    
     set({ isSaving: true, error: null })
     
     try {
@@ -143,29 +157,17 @@ export const useTradeStore = create<TradeState>((set, get) => ({
       const { trades } = get()
       const existingIndex = trades.findIndex(t => t.id === trade.id)
       
-      const tradeSummary: TradeSummary = {
-        id: trade.id,
-        ticker: trade.ticker,
-        entryDate: trade.entryDate,
-        exitDate: trade.exitDate,
-        type: trade.type,
-        outcome: trade.postTradeNotes?.outcome,
-        profitLoss: trade.postTradeNotes?.profitLoss,
-        linkedThesisId: trade.linkedThesisId,
-        createdAt: trade.createdAt,
-        updatedAt: trade.updatedAt,
-      }
       
-      let updatedTrades: TradeSummary[]
+      let updatedTrades: Trade[]
       
       if (existingIndex >= 0) {
         // Update existing trade
         updatedTrades = trades.map((t, index) => 
-          index === existingIndex ? tradeSummary : t
+          index === existingIndex ? trade : t
         )
       } else {
         // Add new trade
-        updatedTrades = [tradeSummary, ...trades]
+        updatedTrades = [trade, ...trades]
       }
       
       set({ 
@@ -176,7 +178,7 @@ export const useTradeStore = create<TradeState>((set, get) => ({
       
       // Reapply filters
       get()._applyFilters()
-      
+
       return savedId || null
       
     } catch (error) {
@@ -263,9 +265,22 @@ export const useTradeStore = create<TradeState>((set, get) => ({
       filtered = filtered.filter(trade => trade.type === filters.type)
     }
     
-    // Filter by outcome
+    // Filter by outcome (calculate from P&L for full Trade objects)
     if (filters.outcome && filters.outcome !== 'all') {
-      filtered = filtered.filter(trade => trade.outcome === filters.outcome)
+      filtered = filtered.filter(trade => {
+        if (trade.status !== 'closed') return false // Only closed trades have outcomes
+        
+        const entryPrice = trade.entryPrice || 0
+        const exitPrice = trade.exitPrice || 0
+        const quantity = trade.quantity || 0
+        const pnl = (exitPrice - entryPrice) * quantity
+        
+        if (filters.outcome === 'win') return pnl > 0
+        if (filters.outcome === 'loss') return pnl < 0
+        if (filters.outcome === 'breakeven') return pnl === 0
+        
+        return true
+      })
     }
     
     // Filter by date range
@@ -292,6 +307,7 @@ export const useTradeStore = create<TradeState>((set, get) => ({
     filtered.sort((a, b) => 
       new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime()
     )
+    
     
     set({ filteredTrades: filtered })
   },
@@ -340,21 +356,40 @@ export const useTradeSelectors = () => {
     error: store.error,
     hasError: !!store.error,
     
-    // Statistics selectors
-    winCount: store.filteredTrades.filter(t => t.outcome === 'win').length,
-    lossCount: store.filteredTrades.filter(t => t.outcome === 'loss').length,
-    breakevenCount: store.filteredTrades.filter(t => t.outcome === 'breakeven').length,
-    completedTradeCount: store.filteredTrades.filter(t => t.outcome).length,
+    // Statistics selectors (calculated from full Trade objects)
+    winCount: store.filteredTrades.filter(t => {
+      if (t.status !== 'closed') return false
+      const pnl = ((t.exitPrice || 0) - (t.entryPrice || 0)) * (t.quantity || 0)
+      return pnl > 0
+    }).length,
+    lossCount: store.filteredTrades.filter(t => {
+      if (t.status !== 'closed') return false
+      const pnl = ((t.exitPrice || 0) - (t.entryPrice || 0)) * (t.quantity || 0)
+      return pnl < 0
+    }).length,
+    breakevenCount: store.filteredTrades.filter(t => {
+      if (t.status !== 'closed') return false
+      const pnl = ((t.exitPrice || 0) - (t.entryPrice || 0)) * (t.quantity || 0)
+      return pnl === 0
+    }).length,
+    completedTradeCount: store.filteredTrades.filter(t => t.status === 'closed').length,
     winRate: (() => {
-      const completed = store.filteredTrades.filter(t => t.outcome).length
+      const completed = store.filteredTrades.filter(t => t.status === 'closed').length
       if (completed === 0) return 0
-      const wins = store.filteredTrades.filter(t => t.outcome === 'win').length
+      const wins = store.filteredTrades.filter(t => {
+        if (t.status !== 'closed') return false
+        const pnl = ((t.exitPrice || 0) - (t.entryPrice || 0)) * (t.quantity || 0)
+        return pnl > 0
+      }).length
       return Math.round((wins / completed) * 100)
     })(),
     
     totalPnL: store.filteredTrades
-      .filter(t => typeof t.profitLoss === 'number')
-      .reduce((sum, t) => sum + (t.profitLoss || 0), 0),
+      .filter(t => t.status === 'closed')
+      .reduce((sum, t) => {
+        const pnl = ((t.exitPrice || 0) - (t.entryPrice || 0)) * (t.quantity || 0)
+        return sum + pnl
+      }, 0),
   }
 }
 

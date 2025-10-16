@@ -4,10 +4,44 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:;" />
-  <title>Trading Journal</title>
+  <meta name="description" content="A comprehensive desktop application for tracking and analyzing your trading performance" />
+  <meta name="author" content="Trading Journal Team" />
+  <meta name="keywords" content="trading, journal, finance, analytics, performance, desktop" />
+  <meta name="application-name" content="Trading Journal" />
+  <title>Trading Journal - Professional Trading Analytics</title>
+  <link rel="icon" type="image/png" href="/assets/icon.png" />
+  <style>
+    /* Prevent flash of unstyled content */
+    #root {
+      background-color: #f8fafc;
+      min-height: 100vh;
+    }
+    
+    /* Loading spinner while app initializes */
+    .loading-spinner {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 32px;
+      height: 32px;
+      border: 3px solid #e2e8f0;
+      border-top: 3px solid #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <!-- Loading spinner shown while React app initializes -->
+    <div class="loading-spinner"></div>
+  </div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>

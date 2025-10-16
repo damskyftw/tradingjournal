@@ -8,7 +8,7 @@ interface LoadingSpinnerProps {
   text?: string;
 }
 
-export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
+export const LoadingSpinner: React.FC<LoadingSpinnerProps> = React.memo(({
   size = 'md',
   className,
   text
@@ -30,7 +30,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
       </div>
     </div>
   );
-};
+});
 
 interface LoadingSkeletonProps {
   className?: string;
@@ -40,7 +40,7 @@ interface LoadingSkeletonProps {
   lines?: number;
 }
 
-export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
+export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = React.memo(({
   className,
   variant = 'text',
   width,
@@ -82,14 +82,14 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
       style={style}
     />
   );
-};
+});
 
 interface LoadingCardProps {
   className?: string;
   showAvatar?: boolean;
 }
 
-export const LoadingCard: React.FC<LoadingCardProps> = ({
+export const LoadingCard: React.FC<LoadingCardProps> = React.memo(({
   className,
   showAvatar = false
 }) => {
@@ -110,7 +110,7 @@ export const LoadingCard: React.FC<LoadingCardProps> = ({
       </div>
     </div>
   );
-};
+});
 
 interface LoadingTableProps {
   rows?: number;
@@ -118,7 +118,7 @@ interface LoadingTableProps {
   className?: string;
 }
 
-export const LoadingTable: React.FC<LoadingTableProps> = ({
+export const LoadingTable: React.FC<LoadingTableProps> = React.memo(({
   rows = 5,
   columns = 4,
   className
@@ -146,7 +146,7 @@ export const LoadingTable: React.FC<LoadingTableProps> = ({
       ))}
     </div>
   );
-};
+});
 
 // Loading overlay for full-screen loading states
 interface LoadingOverlayProps {
@@ -155,7 +155,7 @@ interface LoadingOverlayProps {
   className?: string;
 }
 
-export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
+export const LoadingOverlay: React.FC<LoadingOverlayProps> = React.memo(({
   isVisible,
   text = 'Loading...',
   className
@@ -172,4 +172,4 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
       </div>
     </div>
   );
-};
+});

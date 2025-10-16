@@ -1,508 +1,314 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Settings as SettingsIcon, 
-  Download, 
-  Upload, 
-  Trash2, 
-  HardDrive, 
-  Shield, 
-  Clock, 
-  AlertTriangle,
-  CheckCircle,
-  Loader2,
-  FolderOpen
-} from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Switch } from '../components/ui/switch';
-
-interface BackupMetadata {
-  id: string;
-  timestamp: string;
-  size: number;
-  fileCount: number;
-  version: string;
-}
-
-interface BackupProgress {
-  phase: 'scanning' | 'compressing' | 'finalizing' | 'complete';
-  filesProcessed: number;
-  totalFiles: number;
-  bytesProcessed: number;
-  totalBytes: number;
-  currentFile?: string;
-  percentage: number;
-}
+import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { ArrowLeft, Home, Download, Upload, HardDrive, Trash2, AlertTriangle } from 'lucide-react'
+import { useModernTheme, themes, ThemeName } from '../contexts/ModernThemeContext'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Button } from '../components/ui/button'
+import toast from 'react-hot-toast'
 
 export function Settings() {
-  const [backups, setBackups] = useState<BackupMetadata[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [backupProgress, setBackupProgress] = useState<BackupProgress | null>(null);
-  const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
-  const [backupLocation, setBackupLocation] = useState('');
-  const [backupsSize, setBackupsSize] = useState({ totalSize: 0, backupCount: 0 });
+  const { currentTheme, themeName, setTheme } = useModernTheme()
+  const [storageStats, setStorageStats] = useState<any>(null)
+  const [isExporting, setIsExporting] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
 
-  useEffect(() => {
-    loadBackups();
-    loadSettings();
-    loadBackupsSize();
-  }, []);
-
-  const loadBackups = async () => {
-    try {
-      const result = await window.api.listBackups();
-      if (result.success && result.data) {
-        setBackups(result.data);
-      }
-    } catch (error) {
-      console.error('Failed to load backups:', error);
-    }
-  };
-
-  const loadSettings = () => {
-    // Load settings from localStorage or API
-    const autoBackup = localStorage.getItem('autoBackupEnabled') === 'true';
-    const location = localStorage.getItem('backupLocation') || '';
-    setAutoBackupEnabled(autoBackup);
-    setBackupLocation(location);
-  };
-
-  const loadBackupsSize = async () => {
-    try {
-      const result = await window.api.getBackupsSize();
-      if (result.success && result.data) {
-        setBackupsSize(result.data);
-      }
-    } catch (error) {
-      console.error('Failed to load backups size:', error);
-    }
-  };
-
-  const handleCreateBackup = async () => {
-    setIsLoading(true);
-    setBackupProgress({
-      phase: 'scanning',
-      filesProcessed: 0,
-      totalFiles: 0,
-      bytesProcessed: 0,
-      totalBytes: 0,
-      percentage: 0
-    });
-
-    try {
-      // Set up progress callback
-      const progressCallback = (progress: BackupProgress) => {
-        setBackupProgress(progress);
-      };
-
-      const result = await window.api.createBackup(progressCallback);
-      
-      if (result.success) {
-        await loadBackups();
-        await loadBackupsSize();
-        setBackupProgress(null);
-      } else {
-        console.error('Backup failed:', result.error);
-        // Show error toast
-      }
-    } catch (error) {
-      console.error('Failed to create backup:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleRestoreBackup = async (backupId: string) => {
-    if (!confirm('This will replace all current data with the backup. Are you sure?')) {
-      return;
-    }
-
-    setIsLoading(true);
-    setBackupProgress({
-      phase: 'scanning',
-      filesProcessed: 0,
-      totalFiles: 0,
-      bytesProcessed: 0,
-      totalBytes: 0,
-      percentage: 0
-    });
-
-    try {
-      const progressCallback = (progress: BackupProgress) => {
-        setBackupProgress(progress);
-      };
-
-      const result = await window.api.restoreBackup(backupId, progressCallback);
-      
-      if (result.success) {
-        setBackupProgress(null);
-        // Show success message and possibly restart app
-        alert('Backup restored successfully. Please restart the application.');
-      } else {
-        console.error('Restore failed:', result.error);
-      }
-    } catch (error) {
-      console.error('Failed to restore backup:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDeleteBackup = async (backupId: string) => {
-    if (!confirm('Are you sure you want to delete this backup? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      const result = await window.api.deleteBackup(backupId);
-      if (result.success) {
-        await loadBackups();
-        await loadBackupsSize();
-      } else {
-        console.error('Delete failed:', result.error);
-      }
-    } catch (error) {
-      console.error('Failed to delete backup:', error);
-    }
-  };
-
-  const handleValidateBackup = async (backupId: string) => {
-    try {
-      const result = await window.api.validateBackup(backupId);
-      if (result.success && result.data) {
-        if (result.data.isValid) {
-          alert('Backup is valid and can be restored.');
-        } else {
-          alert(`Backup validation failed:\n${result.data.errors.join('\n')}`);
+  // Load storage stats on component mount
+  React.useEffect(() => {
+    const loadStorageStats = async () => {
+      try {
+        const response = await window.api.data.getStats()
+        if (response.success) {
+          setStorageStats(response.data)
         }
+      } catch (error) {
+        console.error('Error loading storage stats:', error)
       }
-    } catch (error) {
-      console.error('Failed to validate backup:', error);
     }
-  };
+    loadStorageStats()
+  }, [])
 
-  const handleSelectBackupLocation = async () => {
+  const handleExportData = async () => {
+    setIsExporting(true)
     try {
-      const result = await window.api.selectDirectory();
-      if (result.success && result.data) {
-        setBackupLocation(result.data.path);
-        localStorage.setItem('backupLocation', result.data.path);
+      const response = await window.api.data.export()
+
+      if (!response.success) {
+        throw new Error(response.error || 'Export failed')
       }
+
+      const blob = new Blob([response.data!], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+
+      link.href = url
+      link.download = `trading-journal-backup-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      toast.success('Data exported successfully!')
     } catch (error) {
-      console.error('Failed to select directory:', error);
+      console.error('Export error:', error)
+      toast.error('Failed to export data')
+    } finally {
+      setIsExporting(false)
     }
-  };
+  }
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
+  const handleImportData = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
 
-  const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleString();
-  };
+    setIsImporting(true)
+    try {
+      const text = await file.text()
+      const response = await window.api.data.import(text)
 
-  const getProgressPhaseText = (phase: string): string => {
-    switch (phase) {
-      case 'scanning': return 'Scanning files...';
-      case 'compressing': return 'Creating archive...';
-      case 'finalizing': return 'Finalizing backup...';
-      case 'complete': return 'Complete!';
-      default: return 'Processing...';
+      if (!response.success) {
+        throw new Error(response.error || 'Import failed')
+      }
+
+      toast.success('Data imported successfully! Refreshing page...')
+      setTimeout(() => {
+        window.location.reload()
+      }, 1500)
+    } catch (error) {
+      console.error('Import error:', error)
+      toast.error('Failed to import data. Please check the file format.')
+    } finally {
+      setIsImporting(false)
+      // Reset file input
+      event.target.value = ''
     }
-  };
+  }
+
+  const handleClearAllData = async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to clear ALL data? This will permanently delete all trades, theses, and screenshots. This action cannot be undone!'
+    )
+
+    if (!confirmed) return
+
+    try {
+      const response = await window.api.data.clear()
+
+      if (!response.success) {
+        throw new Error(response.error || 'Clear failed')
+      }
+
+      toast.success('All data cleared successfully! Refreshing page...')
+      setTimeout(() => {
+        window.location.reload()
+      }, 1500)
+    } catch (error) {
+      console.error('Clear error:', error)
+      toast.error('Failed to clear data')
+    }
+  }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <SettingsIcon className="h-8 w-8 text-slate-600" />
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Settings</h1>
-          <p className="text-slate-600">Manage your trading journal preferences and data</p>
-        </div>
-      </div>
-
-      {/* Backup & Restore Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <HardDrive className="h-5 w-5" />
-            Backup & Restore
-          </CardTitle>
-          <CardDescription>
-            Keep your trading data safe with automated backups and easy restore options
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Backup Statistics */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-slate-50 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-slate-900">{backupsSize.backupCount}</div>
-              <div className="text-sm text-slate-600">Total Backups</div>
-            </div>
-            <div className="bg-slate-50 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-slate-900">{formatFileSize(backupsSize.totalSize)}</div>
-              <div className="text-sm text-slate-600">Storage Used</div>
-            </div>
-            <div className="bg-slate-50 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-slate-900">
-                {backups.length > 0 ? 'Latest' : 'None'}
-              </div>
-              <div className="text-sm text-slate-600">
-                {backups.length > 0 ? formatDate(backups[0].timestamp) : 'No backups yet'}
-              </div>
-            </div>
+    <div 
+      className="min-h-screen p-6"
+      style={{ 
+        background: currentTheme.colors.background.gradient,
+        color: currentTheme.colors.text.primary
+      }}
+    >
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Navigation Header */}
+        <div className="flex items-center justify-between">
+          <Link to="/">
+            <Button
+              variant="outline"
+              size="sm"
+              style={{
+                background: `rgba(${currentTheme.colors.primary.rgb}, 0.1)`,
+                borderColor: `rgba(${currentTheme.colors.primary.rgb}, 0.3)`,
+                color: currentTheme.colors.text.primary,
+                backdropFilter: currentTheme.effects.glassMorphism
+              }}
+              className="hover:scale-105 transition-all duration-200"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
+          
+          <div className="flex items-center space-x-2 opacity-70">
+            <Home className="w-4 h-4" />
+            <span className="text-sm">Dashboard / Settings</span>
           </div>
+        </div>
 
-          {/* Backup Controls */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label className="text-base font-medium">Automatic Backups</Label>
-                <p className="text-sm text-slate-600">Automatically create backups when the app starts</p>
-              </div>
-              <Switch
-                checked={autoBackupEnabled}
-                onCheckedChange={(checked) => {
-                  setAutoBackupEnabled(checked);
-                  localStorage.setItem('autoBackupEnabled', checked.toString());
-                }}
-              />
+        <h1 className="text-3xl font-bold">Settings</h1>
+        
+        <Card style={{
+          background: currentTheme.colors.background.glass,
+          backdropFilter: currentTheme.effects.glassMorphism,
+          border: `1px solid rgba(255,255,255,0.2)`,
+          color: currentTheme.colors.text.primary
+        }}>
+          <CardHeader>
+            <CardTitle>Theme Preferences</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(themes).map(([key, theme]) => (
+                <button
+                  key={key}
+                  onClick={() => setTheme(key as ThemeName)}
+                  className={`p-4 rounded-lg border-2 transition-all duration-200 hover:scale-105 ${
+                    themeName === key ? 'border-white' : 'border-transparent'
+                  }`}
+                  style={{
+                    background: theme.colors.background.gradient,
+                    color: theme.colors.text.primary
+                  }}
+                >
+                  <div className="text-sm font-medium mb-2">{theme.name}</div>
+                  <div
+                    className="w-full h-6 rounded"
+                    style={{ background: theme.colors.primary.gradient }}
+                  />
+                </button>
+              ))}
             </div>
 
-            <div className="space-y-2">
-              <Label>Backup Location</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={backupLocation}
-                  placeholder="Default backup location"
-                  readOnly
-                  className="flex-1"
-                />
-                <Button variant="outline" onClick={handleSelectBackupLocation}>
-                  <FolderOpen className="h-4 w-4 mr-2" />
-                  Browse
+            <div className="mt-6 p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)' }}>
+              <h4 className="font-medium mb-2">Current Theme: {themes[themeName].name}</h4>
+              <p className="text-sm opacity-70">
+                Five professional themes available: cosmicDark, arcticLight, sunset, matrix, synthwave
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Data Management Card */}
+        <Card style={{
+          background: currentTheme.colors.background.glass,
+          backdropFilter: currentTheme.effects.glassMorphism,
+          border: `1px solid rgba(255,255,255,0.2)`,
+          color: currentTheme.colors.text.primary
+        }}>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <HardDrive className="w-5 h-5" />
+              <span>Data Management</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Storage Stats */}
+            {storageStats && (
+              <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                <h4 className="font-medium mb-3">Storage Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <div className="opacity-70">Total Storage Used:</div>
+                    <div className="font-medium">
+                      {(storageStats.storage.sizeMB).toFixed(2)} MB
+                      {storageStats.storage.warningThreshold && (
+                        <span className="ml-2 text-orange-400">⚠️ Near Limit</span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="opacity-70">Screenshots:</div>
+                    <div className="font-medium">
+                      {storageStats.screenshots.totalScreenshots} files ({storageStats.screenshots.totalSizeMB.toFixed(2)} MB)
+                    </div>
+                  </div>
+                </div>
+
+                {storageStats.storage.warningThreshold && (
+                  <div className="mt-3 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-200">
+                    <div className="flex items-center space-x-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span className="text-sm font-medium">Storage Warning</span>
+                    </div>
+                    <p className="text-sm mt-1 opacity-80">
+                      You're approaching the browser storage limit. Consider exporting and clearing old data.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Export/Import Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <h4 className="font-medium">Backup & Export</h4>
+                <Button
+                  onClick={handleExportData}
+                  disabled={isExporting}
+                  className="w-full"
+                  style={{
+                    background: 'rgba(34, 197, 94, 0.2)',
+                    borderColor: 'rgba(34, 197, 94, 0.3)',
+                    color: '#22c55e'
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  {isExporting ? 'Exporting...' : 'Export All Data'}
+                </Button>
+                <p className="text-xs opacity-60">
+                  Download all your trades, theses, and screenshots as a JSON backup file.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="font-medium">Restore & Import</h4>
+                <label className="block">
+                  <Button
+                    as="span"
+                    disabled={isImporting}
+                    className="w-full cursor-pointer"
+                    style={{
+                      background: 'rgba(59, 130, 246, 0.2)',
+                      borderColor: 'rgba(59, 130, 246, 0.3)',
+                      color: '#3b82f6'
+                    }}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    {isImporting ? 'Importing...' : 'Import Data'}
+                  </Button>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportData}
+                    className="hidden"
+                    disabled={isImporting}
+                  />
+                </label>
+                <p className="text-xs opacity-60">
+                  Restore data from a previously exported backup file.
+                </p>
+              </div>
+            </div>
+
+            {/* Danger Zone */}
+            <div className="pt-6 border-t border-red-500/20">
+              <div className="p-4 rounded-lg" style={{ background: 'rgba(239, 68, 68, 0.1)' }}>
+                <h4 className="font-medium mb-3 text-red-400 flex items-center space-x-2">
+                  <Trash2 className="w-4 h-4" />
+                  <span>Danger Zone</span>
+                </h4>
+                <p className="text-sm opacity-70 mb-4">
+                  Permanently delete all data. This action cannot be undone and will remove all trades, theses, and screenshots.
+                </p>
+                <Button
+                  onClick={handleClearAllData}
+                  variant="destructive"
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Clear All Data
                 </Button>
               </div>
             </div>
-
-            <div className="flex gap-2">
-              <Button 
-                onClick={handleCreateBackup} 
-                disabled={isLoading}
-                className="flex-1"
-              >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                Create Backup
-              </Button>
-              <Button variant="outline" disabled={isLoading}>
-                <Upload className="h-4 w-4 mr-2" />
-                Import Settings
-              </Button>
-            </div>
-          </div>
-
-          {/* Progress Display */}
-          {backupProgress && (
-            <Card className="border-blue-200 bg-blue-50">
-              <CardContent className="p-4">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-blue-900">
-                      {getProgressPhaseText(backupProgress.phase)}
-                    </span>
-                    <span className="text-sm text-blue-700">
-                      {backupProgress.percentage}%
-                    </span>
-                  </div>
-                  
-                  <div className="w-full bg-blue-200 rounded-full h-2">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${backupProgress.percentage}%` }}
-                    />
-                  </div>
-
-                  {backupProgress.currentFile && (
-                    <div className="text-xs text-blue-700 truncate">
-                      Processing: {backupProgress.currentFile}
-                    </div>
-                  )}
-
-                  <div className="text-xs text-blue-700">
-                    {backupProgress.totalFiles > 0 && (
-                      <>
-                        Files: {backupProgress.filesProcessed}/{backupProgress.totalFiles} • 
-                        Size: {formatFileSize(backupProgress.bytesProcessed)}/{formatFileSize(backupProgress.totalBytes)}
-                      </>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Backup List */}
-          <div className="space-y-2">
-            <Label className="text-base font-medium">Available Backups</Label>
-            {backups.length === 0 ? (
-              <div className="text-center py-8 text-slate-500">
-                <HardDrive className="h-12 w-12 mx-auto mb-4 text-slate-300" />
-                <p>No backups available</p>
-                <p className="text-sm">Create your first backup to get started</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {backups.map((backup) => (
-                  <div key={backup.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex-1">
-                      <div className="font-medium">{formatDate(backup.timestamp)}</div>
-                      <div className="text-sm text-slate-600">
-                        {formatFileSize(backup.size)} • {backup.fileCount} files • v{backup.version}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleValidateBackup(backup.id)}
-                        disabled={isLoading}
-                      >
-                        <Shield className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleRestoreBackup(backup.id)}
-                        disabled={isLoading}
-                      >
-                        <Upload className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDeleteBackup(backup.id)}
-                        disabled={isLoading}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Data Management */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            Data Management
-          </CardTitle>
-          <CardDescription>
-            Clean up and optimize your trading journal data
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Button variant="outline" className="h-auto p-4 justify-start">
-              <div className="flex items-start gap-3">
-                <Trash2 className="h-5 w-5 mt-0.5 text-red-500" />
-                <div className="text-left">
-                  <div className="font-medium">Clean Unused Screenshots</div>
-                  <div className="text-sm text-slate-600">Remove screenshots not linked to any trades</div>
-                </div>
-              </div>
-            </Button>
-            
-            <Button variant="outline" className="h-auto p-4 justify-start">
-              <div className="flex items-start gap-3">
-                <Clock className="h-5 w-5 mt-0.5 text-blue-500" />
-                <div className="text-left">
-                  <div className="font-medium">Archive Old Data</div>
-                  <div className="text-sm text-slate-600">Move trades older than 2 years to archive</div>
-                </div>
-              </div>
-            </Button>
-          </div>
-
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <div className="font-medium text-yellow-800">Data Safety Reminder</div>
-                <div className="text-sm text-yellow-700 mt-1">
-                  Always create a backup before performing data cleanup operations. 
-                  These actions cannot be undone.
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Application Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <SettingsIcon className="h-5 w-5" />
-            Application Settings
-          </CardTitle>
-          <CardDescription>
-            Configure your trading journal preferences
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Dark Mode</Label>
-                  <p className="text-sm text-slate-600">Use dark theme for the interface</p>
-                </div>
-                <Switch defaultChecked={false} />
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Startup Reminders</Label>
-                  <p className="text-sm text-slate-600">Show trading reminders on app start</p>
-                </div>
-                <Switch defaultChecked={true} />
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <Label>Default Trade Size</Label>
-                <Input type="number" placeholder="1000" className="mt-1" />
-              </div>
-              
-              <div>
-                <Label>Currency</Label>
-                <select className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md">
-                  <option value="USD">USD ($)</option>
-                  <option value="EUR">EUR (€)</option>
-                  <option value="GBP">GBP (£)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
-  );
+  )
 }

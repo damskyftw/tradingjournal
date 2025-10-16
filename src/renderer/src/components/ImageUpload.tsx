@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Upload, X, Image as ImageIcon, Copy, Eye, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -19,7 +19,7 @@ interface ImageUploadProps {
   className?: string;
 }
 
-export const ImageUpload: React.FC<ImageUploadProps> = ({
+export const ImageUpload: React.FC<ImageUploadProps> = React.memo(({
   images = [],
   onImagesChange,
   maxImages = 10,
@@ -29,7 +29,32 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<ImageFile[]>([]);
   const [showPreview, setShowPreview] = useState<string | null>(null);
+  const [imageDataUrls, setImageDataUrls] = useState<Map<string, string>>(new Map());
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load data URLs for saved images
+  useEffect(() => {
+    const loadImageDataUrls = async () => {
+      const urlMap = new Map<string, string>();
+      
+      for (const imagePath of images) {
+        try {
+          const dataUrl = await window.api.getImageDataUrl(imagePath);
+          urlMap.set(imagePath, dataUrl);
+        } catch (error) {
+          console.error('Failed to load image data URL for:', imagePath, error);
+          // Fallback to file:// URL
+          urlMap.set(imagePath, `file://${imagePath}`);
+        }
+      }
+      
+      setImageDataUrls(urlMap);
+    };
+
+    if (images.length > 0) {
+      loadImageDataUrls();
+    }
+  }, [images]);
 
   // Handle file validation
   const validateFile = (file: File): string | null => {
@@ -94,17 +119,23 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       try {
         // Convert file to base64 for IPC
         const base64 = await fileToBase64(imageFile.file);
-        const result = await window.api.saveScreenshot({
+        
+        // Use the screenshot API properly
+        const result = await window.api.screenshot.save({
           filename: imageFile.name,
           data: base64,
-          tradeId: 'current' // This would be passed as prop in real implementation
+          tradeId: undefined // Let the backend handle file naming
         });
         
         if (result.success && result.data) {
           savedPaths.push(result.data.path);
+        } else {
+          console.error('Failed to save screenshot:', result.error);
+          // Could show toast notifications here
         }
       } catch (error) {
         console.error('Failed to save image:', error);
+        // Could show toast notifications here
       }
     }
     
@@ -189,7 +220,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       // Remove from saved images
       const imageToRemove = images[index];
       try {
-        await window.api.deleteScreenshot({ path: imageToRemove });
+        await window.api.screenshot.delete({ path: imageToRemove });
         const newImages = images.filter((_, i) => i !== index);
         onImagesChange(newImages);
       } catch (error) {
@@ -258,42 +289,53 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       {(images.length > 0 || uploadedImages.length > 0) && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {/* Saved Images */}
-          {images.map((imagePath, index) => (
-            <Card key={`saved-${index}`} className="relative group overflow-hidden">
-              <div className="aspect-square relative">
-                <img
-                  src={`file://${imagePath}`}
-                  alt={`Screenshot ${index + 1}`}
-                  className="w-full h-full object-cover cursor-pointer"
-                  onClick={() => setShowPreview(imagePath)}
-                />
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowPreview(imagePath);
-                      }}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeImage(index, false);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+          {images.map((imagePath, index) => {
+            const imageDataUrl = imageDataUrls.get(imagePath) || `file://${imagePath}`;
+            
+            return (
+              <Card key={`saved-${index}`} className="relative group overflow-hidden">
+                <div className="aspect-square relative">
+                  <img
+                    src={imageDataUrl}
+                    alt={`Screenshot ${index + 1}`}
+                    className="w-full h-full object-cover cursor-pointer"
+                    onClick={() => setShowPreview(imageDataUrl)}
+                    onError={(e) => {
+                      console.error('Failed to load image:', imagePath);
+                      // Remove from data URLs map so it can be retried
+                      const newMap = new Map(imageDataUrls);
+                      newMap.delete(imagePath);
+                      setImageDataUrls(newMap);
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowPreview(imageDataUrl);
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeImage(index, false);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
 
           {/* Newly Uploaded Images */}
           {uploadedImages.map((imageFile, index) => (
@@ -365,4 +407,4 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       )}
     </div>
   );
-};
+});

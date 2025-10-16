@@ -49,7 +49,7 @@ const useDebounce = (value: string, delay: number) => {
 const RECENT_SEARCHES_KEY = 'trading-journal-recent-searches';
 const MAX_RECENT_SEARCHES = 5;
 
-export const SearchBar: React.FC<SearchBarProps> = ({
+export const SearchBar: React.FC<SearchBarProps> = React.memo(({
   trades,
   onSearchResults,
   onClearSearch,
@@ -75,12 +75,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const saveRecentSearch = useCallback((term: string) => {
     if (!term.trim()) return;
     
-    const newRecent = [term, ...recentSearches.filter(s => s !== term)]
-      .slice(0, MAX_RECENT_SEARCHES);
-    
-    setRecentSearches(newRecent);
-    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecent));
-  }, [recentSearches]);
+    setRecentSearches(prev => {
+      const newRecent = [term, ...prev.filter(s => s !== term)]
+        .slice(0, MAX_RECENT_SEARCHES);
+      
+      localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecent));
+      return newRecent;
+    });
+  }, []); // Fixed: removed recentSearches dependency to prevent infinite re-renders
 
   // Configure Fuse.js for fuzzy search
   const fuse = useMemo(() => {
@@ -187,7 +189,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     if (debouncedSearchTerm.trim()) {
       saveRecentSearch(debouncedSearchTerm);
     }
-  }, [debouncedSearchTerm, filters, trades, fuse, onSearchResults, onClearSearch, saveRecentSearch]);
+  }, [debouncedSearchTerm, filters, trades, fuse, onSearchResults, onClearSearch]);
 
   // Trigger search when search term or filters change
   useEffect(() => {
@@ -350,4 +352,4 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       )}
     </div>
   );
-};
+});

@@ -1,4 +1,4 @@
-import type { Trade, TradeSummary, Thesis, ThesisSummary, ApiResponse } from '../../../shared/types'
+import type { Trade, TradeSummary, Thesis, ThesisSummary, ApiResponse } from '../types'
 
 /**
  * API service for communicating with the main process

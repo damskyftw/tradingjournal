@@ -335,6 +335,7 @@ describe('Utility Functions', () => {
       ticker: 'AAPL',
       entryDate: '2025-01-24T10:30:00.000Z',
       type: 'long',
+      status: 'planning',
       preTradeNotes: {
         thesis: 'Strong fundamentals',
         riskAssessment: 'Low risk position',

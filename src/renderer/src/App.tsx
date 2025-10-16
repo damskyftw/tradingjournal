@@ -1,38 +1,30 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { ModernThemeProvider } from './contexts/ModernThemeContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { ToastProvider } from './components/Toast'
-import { Layout } from './components/Layout'
-import { Dashboard } from './pages/Dashboard'
-import { TradeList } from './pages/TradeList'
+import { ModernDashboard } from './pages/ModernDashboard'
 import { TradeDetail } from './pages/TradeDetail'
 import { NewTrade } from './pages/NewTrade'
-import { ThesisList } from './pages/ThesisList'
 import { NewThesis } from './pages/NewThesis'
-import { ThesisDetail } from './pages/ThesisDetail'
-import { ThesisVersionCompare } from './pages/ThesisVersionCompare'
+import { ThesisList } from './pages/ThesisList'
+import { Analytics } from './pages/Analytics'
 import { Settings } from './pages/Settings'
 
 function App() {
   return (
     <ErrorBoundary>
-      <ToastProvider>
+      <ModernThemeProvider defaultTheme="cosmicDark">
         <Router>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/trades" element={<TradeList />} />
-              <Route path="/trades/new" element={<NewTrade />} />
-              <Route path="/trades/:id" element={<TradeDetail />} />
-              <Route path="/thesis" element={<ThesisList />} />
-              <Route path="/thesis/new" element={<NewThesis />} />
-              <Route path="/thesis/:id" element={<ThesisDetail />} />
-              <Route path="/thesis/:id/compare/:version1/:version2" element={<ThesisVersionCompare />} />
-              <Route path="/analytics" element={<div>Analytics (Coming Soon)</div>} />
-              <Route path="/settings" element={<Settings />} />
-            </Routes>
-          </Layout>
+          <Routes>
+            <Route path="/" element={<ModernDashboard />} />
+            <Route path="/trades/:id" element={<TradeDetail />} />
+            <Route path="/trades/new" element={<NewTrade />} />
+            <Route path="/thesis/new" element={<NewThesis />} />
+            <Route path="/thesis" element={<ThesisList />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/settings" element={<Settings />} />
+          </Routes>
         </Router>
-      </ToastProvider>
+      </ModernThemeProvider>
     </ErrorBoundary>
   )
 }

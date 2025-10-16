@@ -10,6 +10,9 @@ export type TradeType = z.infer<typeof TradeType>
 export const TradeOutcome = z.enum(['win', 'loss', 'breakeven'])
 export type TradeOutcome = z.infer<typeof TradeOutcome>
 
+export const TradeStatus = z.enum(['planning', 'open', 'monitoring', 'closed', 'cancelled'])
+export type TradeStatus = z.infer<typeof TradeStatus>
+
 export const MarketOutlook = z.enum(['bullish', 'bearish', 'neutral'])
 export type MarketOutlook = z.infer<typeof MarketOutlook>
 
@@ -20,12 +23,29 @@ export type Quarter = z.infer<typeof Quarter>
 // TRADE NOTE TYPES
 // =============================================================================
 
+export const TradeUpdateType = z.enum(['note', 'price_alert', 'stop_loss_adjustment', 'target_adjustment', 'position_size_change', 'exit_plan'])
+export type TradeUpdateType = z.infer<typeof TradeUpdateType>
+
+export const ScreenshotAttachmentSchema = z.object({
+  id: z.string().uuid(),
+  filename: z.string(),
+  path: z.string(),
+  description: z.string().optional(),
+  uploadedAt: z.string().datetime(),
+  fileSize: z.number().positive(),
+})
+
+export type ScreenshotAttachment = z.infer<typeof ScreenshotAttachmentSchema>
+
 export const TradeNoteSchema = z.object({
   id: z.string().uuid(),
   timestamp: z.string().datetime(),
   content: z.string().min(1, 'Note content is required'),
   priceAtTime: z.number().positive().optional(),
+  updateType: TradeUpdateType.default('note'),
   tags: z.array(z.string()).default([]),
+  screenshots: z.array(ScreenshotAttachmentSchema).default([]),
+  isImportant: z.boolean().default(false),
   createdAt: z.string().datetime(),
 })
 
@@ -65,13 +85,17 @@ export const TradeSchema = z.object({
   entryDate: z.string().datetime(),
   exitDate: z.string().datetime().optional(),
   type: TradeType,
+  status: TradeStatus.default('planning'),
   entryPrice: z.number().positive().optional(),
   exitPrice: z.number().positive().optional(),
   quantity: z.number().positive().optional(),
+  currentPrice: z.number().positive().optional(),
+  unrealizedPnL: z.number().optional(),
+  realizedPnL: z.number().optional(),
   preTradeNotes: PreTradeNotesSchema,
   duringTradeNotes: z.array(TradeNoteSchema).default([]),
   postTradeNotes: PostTradeNotesSchema.optional(),
-  screenshots: z.array(z.string()).default([]),
+  screenshots: z.array(z.string()).default([]), // Legacy screenshot paths
   linkedThesisId: z.string().uuid().optional(),
   tags: z.array(z.string()).default([]),
   createdAt: z.string().datetime(),
@@ -173,6 +197,91 @@ export const ThesisSummarySchema = z.object({
 })
 
 export type ThesisSummary = z.infer<typeof ThesisSummarySchema>
+
+// =============================================================================
+// SCREENSHOT TYPES
+// =============================================================================
+
+export interface ScreenshotParams {
+  tradeId: string
+  file: {
+    name: string
+    data: Buffer
+    size: number
+  }
+  description?: string
+}
+
+export interface DeleteScreenshotParams {
+  tradeId: string
+  screenshotId: string
+}
+
+// =============================================================================
+// PERFORMANCE METRICS TYPES
+// =============================================================================
+
+export interface ThesisPerformanceMetrics {
+  totalTrades: number
+  completedTrades: number
+  winningTrades: number
+  losingTrades: number
+  breakEvenTrades: number
+  winRate: number
+  totalProfit: number
+  totalLoss: number
+  netProfitLoss: number
+  averageWin: number
+  averageLoss: number
+  profitFactor: number
+  sharpeRatio?: number
+  maxDrawdown?: number
+  averageTradeDuration?: number
+}
+
+export interface PortfolioPerformanceMetrics {
+  totalTrades: number
+  totalTheses: number
+  overallWinRate: number
+  totalNetProfitLoss: number
+  bestPerformingThesis?: {
+    id: string
+    title: string
+    winRate: number
+    netProfitLoss: number
+  }
+  worstPerformingThesis?: {
+    id: string
+    title: string
+    winRate: number
+    netProfitLoss: number
+  }
+}
+
+// =============================================================================
+// BACKUP TYPES
+// =============================================================================
+
+export interface BackupMetadata {
+  id: string
+  timestamp: string
+  size: number
+  fileCount: number
+  version: string
+  checksum?: string
+}
+
+export interface BackupProgress {
+  phase: 'scanning' | 'compressing' | 'finalizing' | 'complete'
+  filesProcessed: number
+  totalFiles: number
+  bytesProcessed: number
+  totalBytes: number
+  currentFile?: string
+  percentage: number
+}
+
+export type ProgressCallback = (progress: BackupProgress) => void
 
 // =============================================================================
 // API RESPONSE TYPES
@@ -282,10 +391,64 @@ export const formatThesisFilename = (thesis: Thesis): string => {
 }
 
 // =============================================================================
+// P&L CALCULATION UTILITIES
+// =============================================================================
+
+export const calculateUnrealizedPnL = (
+  entryPrice: number,
+  currentPrice: number,
+  quantity: number,
+  type: TradeType
+): number => {
+  if (type === 'long') {
+    return (currentPrice - entryPrice) * quantity
+  } else {
+    return (entryPrice - currentPrice) * quantity
+  }
+}
+
+export const calculateRealizedPnL = (
+  entryPrice: number,
+  exitPrice: number,
+  quantity: number,
+  type: TradeType
+): number => {
+  if (type === 'long') {
+    return (exitPrice - entryPrice) * quantity
+  } else {
+    return (entryPrice - exitPrice) * quantity
+  }
+}
+
+export const calculatePnLPercentage = (
+  entryPrice: number,
+  currentOrExitPrice: number,
+  type: TradeType
+): number => {
+  if (type === 'long') {
+    return ((currentOrExitPrice - entryPrice) / entryPrice) * 100
+  } else {
+    return ((entryPrice - currentOrExitPrice) / entryPrice) * 100
+  }
+}
+
+export const isTradeWinning = (pnl: number): boolean => {
+  return pnl > 0
+}
+
+export const getTradeOutcomeFromPnL = (pnl: number): TradeOutcome => {
+  if (pnl > 0) return 'win'
+  if (pnl < 0) return 'loss'
+  return 'breakeven'
+}
+
+// =============================================================================
 // CONSTANTS
 // =============================================================================
 
 export const TRADE_OUTCOMES = ['win', 'loss', 'breakeven'] as const
 export const TRADE_TYPES = ['long', 'short'] as const
+export const TRADE_STATUSES = ['planning', 'open', 'monitoring', 'closed', 'cancelled'] as const
+export const TRADE_UPDATE_TYPES = ['note', 'price_alert', 'stop_loss_adjustment', 'target_adjustment', 'position_size_change', 'exit_plan'] as const
 export const MARKET_OUTLOOKS = ['bullish', 'bearish', 'neutral'] as const
 export const QUARTERS = ['Q1', 'Q2', 'Q3', 'Q4'] as const

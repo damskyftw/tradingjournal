@@ -1,279 +1,444 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { motion } from 'framer-motion'
+import { 
+  ArrowLeft, 
+  Calendar, 
+  TrendingUp, 
+  TrendingDown, 
+  Target, 
+  AlertCircle,
+  FileText,
+  Plus,
+  Eye,
+  Edit3,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react'
+import { format } from 'date-fns'
+import { useModernTheme } from '../contexts/ModernThemeContext'
 import { Button } from '../components/ui/button'
-import { Plus, FileText, Users, TrendingUp, TrendingDown, Eye, MoreHorizontal } from 'lucide-react'
-import { ApiService } from '../services/api'
-import type { ThesisSummary } from '../../../shared/types'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
+
+interface Thesis {
+  id: string
+  title: string
+  quarter: string
+  year: number
+  marketOutlook: string
+  ecosystems: string[]
+  avoidEcosystems?: string[]
+  themes?: string[]
+  strategies: string[]
+  maxPositionSize: number[]
+  stopLossRules: string
+  profitTarget: number[]
+  tradeCount: number[]
+  learningObjectives?: string[]
+  createdAt: string
+  updatedAt: string
+}
 
 export function ThesisList() {
-  const [theses, setTheses] = useState<ThesisSummary[]>([])
+  const { currentTheme } = useModernTheme()
+  const [theses, setTheses] = useState<Thesis[]>([])
+  const [expandedThesis, setExpandedThesis] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    loadTheses()
+    // Load theses from localStorage
+    const storedTheses = JSON.parse(localStorage.getItem('theses') || '[]')
+    // Sort by most recent first
+    const sortedTheses = storedTheses.sort((a: Thesis, b: Thesis) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
+    setTheses(sortedTheses)
+    setLoading(false)
   }, [])
-
-  const loadTheses = async () => {
-    try {
-      setLoading(true)
-      const response = await ApiService.listTheses()
-      
-      if (response.success && response.data) {
-        setTheses(response.data)
-      } else {
-        setError(response.error || 'Failed to load theses')
-      }
-    } catch (err) {
-      setError('Failed to load theses')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-  }
 
   const getMarketOutlookColor = (outlook: string) => {
     switch (outlook) {
-      case 'bullish':
-        return 'text-green-600 bg-green-100'
-      case 'bearish':
-        return 'text-red-600 bg-red-100'
-      case 'neutral':
-        return 'text-yellow-600 bg-yellow-100'
-      default:
-        return 'text-slate-600 bg-slate-100'
+      case 'bullish': return '#10B981'
+      case 'bearish': return '#EF4444'
+      case 'neutral': return '#6B7280'
+      default: return currentTheme.colors.text.secondary
     }
   }
 
   const getMarketOutlookIcon = (outlook: string) => {
     switch (outlook) {
-      case 'bullish':
-        return <TrendingUp className="h-4 w-4" />
-      case 'bearish':
-        return <TrendingDown className="h-4 w-4" />
-      default:
-        return <Eye className="h-4 w-4" />
+      case 'bullish': return <TrendingUp className="w-4 h-4" />
+      case 'bearish': return <TrendingDown className="w-4 h-4" />
+      case 'neutral': return <Target className="w-4 h-4" />
+      default: return <AlertCircle className="w-4 h-4" />
     }
+  }
+
+  const getCardStyle = () => ({
+    background: currentTheme.colors.background.glass,
+    backdropFilter: currentTheme.effects.glassMorphism,
+    border: `1px solid rgba(255,255,255,0.2)`,
+    color: currentTheme.colors.text.primary
+  })
+
+  const toggleExpanded = (thesisId: string) => {
+    console.log('Toggling thesis:', thesisId, 'Current expanded:', expandedThesis)
+    setExpandedThesis(expandedThesis === thesisId ? null : thesisId)
   }
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Trading Thesis</h1>
-            <p className="text-slate-600">Strategic planning and market outlook</p>
-          </div>
+      <div className="min-h-screen p-6 flex items-center justify-center" style={{ background: currentTheme.colors.background.gradient }}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: currentTheme.colors.primary.solid }}></div>
+          <p>Loading theses...</p>
         </div>
-        <Card>
-          <CardContent className="p-8">
-            <div className="flex items-center justify-center">
-              <div className="text-slate-500">Loading theses...</div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Trading Thesis</h1>
-            <p className="text-slate-600">Strategic planning and market outlook</p>
-          </div>
-        </div>
-        <Card>
-          <CardContent className="p-8">
-            <div className="text-center text-red-600">
-              Error: {error}
-            </div>
-          </CardContent>
-        </Card>
       </div>
     )
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Trading Thesis</h1>
-          <p className="text-slate-600">Strategic planning and market outlook</p>
-        </div>
-        <Button asChild>
-          <Link to="/thesis/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Thesis
-          </Link>
-        </Button>
+    <section 
+      className="min-h-screen p-6 relative overflow-hidden"
+      style={{ 
+        background: currentTheme.colors.background.gradient,
+        color: currentTheme.colors.text.primary
+      }}
+    >
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <motion.div
+          className="absolute -top-40 -right-40 w-80 h-80 rounded-full opacity-20"
+          style={{ 
+            background: currentTheme.colors.primary.gradient,
+            filter: 'blur(40px)'
+          }}
+          animate={{
+            scale: [1, 1.2, 1],
+            rotate: [0, 180, 360],
+          }}
+          transition={{
+            duration: 20,
+            repeat: Infinity,
+            ease: "linear"
+          }}
+        />
       </div>
 
-      {/* Current Quarter Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Current Quarter Status</CardTitle>
-          <CardDescription>
-            Q{Math.ceil((new Date().getMonth() + 1) / 3)} {new Date().getFullYear()} - 
-            Your active trading thesis
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {(() => {
-            const currentYear = new Date().getFullYear()
-            const currentQuarter = `Q${Math.ceil((new Date().getMonth() + 1) / 3)}`
-            const activeThesis = theses.find(
-              thesis => thesis.year === currentYear && 
-                       thesis.quarter === currentQuarter && 
-                       thesis.isActive
-            )
-
-            if (activeThesis) {
-              return (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${getMarketOutlookColor(activeThesis.marketOutlook)}`}>
-                      {getMarketOutlookIcon(activeThesis.marketOutlook)}
-                      {activeThesis.marketOutlook.charAt(0).toUpperCase() + activeThesis.marketOutlook.slice(1)}
-                    </div>
-                    <div>
-                      <h3 className="font-medium">{activeThesis.title}</h3>
-                      <p className="text-sm text-slate-600">
-                        {activeThesis.tradeCount} trades linked
-                      </p>
-                    </div>
-                  </div>
-                  <Button variant="outline" asChild>
-                    <Link to={`/thesis/${activeThesis.id}`}>
-                      View Details
-                    </Link>
-                  </Button>
-                </div>
-              )
-            } else {
-              return (
-                <div className="text-center py-6">
-                  <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-slate-900">No Active Thesis</h3>
-                  <p className="text-slate-600 mb-4">
-                    Create a thesis for {currentQuarter} {currentYear} to guide your trading decisions.
-                  </p>
-                  <Button asChild>
-                    <Link to="/thesis/new">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Create {currentQuarter} {currentYear} Thesis
-                    </Link>
-                  </Button>
-                </div>
-              )
-            }
-          })()}
-        </CardContent>
-      </Card>
-
-      {/* All Theses */}
-      {theses.length === 0 ? (
-        <Card>
-          <CardContent className="p-8">
-            <div className="text-center space-y-4">
-              <FileText className="h-12 w-12 text-slate-300 mx-auto" />
-              <div>
-                <h3 className="text-lg font-medium text-slate-900">No theses yet</h3>
-                <p className="text-slate-600">Start your strategic planning by creating your first thesis.</p>
-              </div>
-              <Button asChild>
-                <Link to="/thesis/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Your First Thesis
-                </Link>
+      <div className="max-w-6xl mx-auto space-y-6 relative z-10">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="flex items-center justify-between"
+        >
+          <div className="flex items-center gap-4">
+            <Link to="/">
+              <Button 
+                variant="outline" 
+                size="sm"
+                style={{
+                  background: `rgba(${currentTheme.colors.primary.rgb}, 0.1)`,
+                  borderColor: `rgba(${currentTheme.colors.primary.rgb}, 0.3)`,
+                  color: currentTheme.colors.text.primary
+                }}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Dashboard
               </Button>
+            </Link>
+            <div>
+              <h1 
+                className="text-3xl font-bold"
+                style={{
+                  background: currentTheme.colors.primary.gradient,
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  color: 'transparent'
+                }}
+              >
+                Trading Theses
+              </h1>
+              <p className="text-sm opacity-70">
+                {theses.length} thesis{theses.length !== 1 ? 'es' : ''} created
+              </p>
             </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>All Theses ({theses.length})</CardTitle>
-            <CardDescription>Historical and current trading theses</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-hidden">
-              <table className="w-full">
-                <thead className="border-b border-slate-200 bg-slate-50">
-                  <tr>
-                    <th className="text-left p-4 font-medium text-slate-900">Quarter</th>
-                    <th className="text-left p-4 font-medium text-slate-900">Title</th>
-                    <th className="text-left p-4 font-medium text-slate-900">Market Outlook</th>
-                    <th className="text-left p-4 font-medium text-slate-900">Trades</th>
-                    <th className="text-left p-4 font-medium text-slate-900">Status</th>
-                    <th className="text-left p-4 font-medium text-slate-900">Created</th>
-                    <th className="text-right p-4 font-medium text-slate-900">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {theses.map((thesis) => (
-                    <tr key={thesis.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="p-4">
-                        <Link
-                          to={`/thesis/${thesis.id}`}
-                          className="font-medium text-blue-600 hover:text-blue-800"
+          </div>
+          
+          <Link to="/thesis/new">
+            <Button 
+              style={{ background: currentTheme.colors.success.gradient }}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Thesis
+            </Button>
+          </Link>
+        </motion.div>
+
+        {/* Theses List */}
+        {theses.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="text-center py-16"
+          >
+            <Card style={getCardStyle()}>
+              <CardContent className="p-12">
+                <div 
+                  className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center"
+                  style={{ 
+                    background: `rgba(${currentTheme.colors.primary.rgb}, 0.1)`,
+                    border: `1px solid rgba(${currentTheme.colors.primary.rgb}, 0.2)`
+                  }}
+                >
+                  <FileText className="w-10 h-10" style={{ color: currentTheme.colors.primary.solid }} />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">No Trading Theses Yet</h3>
+                <p className="text-sm opacity-70 mb-6">
+                  Create your first quarterly trading thesis to define your strategy and risk management approach.
+                </p>
+                <Link to="/thesis/new">
+                  <Button style={{ background: currentTheme.colors.primary.gradient }}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create First Thesis
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ) : (
+          <div className="space-y-4">
+            {theses.map((thesis, index) => (
+              <motion.div
+                key={thesis.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
+              >
+                <Card style={getCardStyle()}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div 
+                          className="p-3 rounded-lg"
+                          style={{ 
+                            background: `rgba(${currentTheme.colors.primary.rgb}, 0.1)`,
+                            border: `1px solid rgba(${currentTheme.colors.primary.rgb}, 0.2)`
+                          }}
                         >
-                          {thesis.quarter} {thesis.year}
-                        </Link>
-                      </td>
-                      <td className="p-4">
-                        <div className="font-medium">{thesis.title}</div>
-                      </td>
-                      <td className="p-4">
-                        <div className={`inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs font-medium ${getMarketOutlookColor(thesis.marketOutlook)}`}>
+                          <FileText className="w-6 h-6" style={{ color: currentTheme.colors.primary.solid }} />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg font-semibold">
+                            {thesis.title || `${thesis.quarter} ${thesis.year} Crypto Trading Strategy`}
+                          </CardTitle>
+                          <div className="flex items-center gap-4 text-sm opacity-70">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-4 h-4" />
+                              {format(new Date(thesis.createdAt), 'MMM dd, yyyy')}
+                            </span>
+                            <span>
+                              {thesis.quarter} {thesis.year}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <div 
+                          className="flex items-center gap-1 px-2 py-1 rounded-md text-sm font-medium"
+                          style={{ 
+                            color: getMarketOutlookColor(thesis.marketOutlook),
+                            background: `${getMarketOutlookColor(thesis.marketOutlook)}20`
+                          }}
+                        >
                           {getMarketOutlookIcon(thesis.marketOutlook)}
-                          {thesis.marketOutlook.charAt(0).toUpperCase() + thesis.marketOutlook.slice(1)}
+                          {thesis.marketOutlook.toUpperCase()}
                         </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-1">
-                          <Users className="h-4 w-4 text-slate-400" />
-                          <span className="text-sm">{thesis.tradeCount}</span>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            thesis.isActive
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleExpanded(thesis.id)}
+                          style={{
+                            background: `rgba(${currentTheme.colors.primary.rgb}, 0.1)`,
+                            borderColor: `rgba(${currentTheme.colors.primary.rgb}, 0.3)`,
+                            color: currentTheme.colors.text.primary
+                          }}
                         >
-                          {thesis.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td className="p-4 text-slate-600">
-                        {formatDate(thesis.createdAt)}
-                      </td>
-                      <td className="p-4 text-right">
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
+                          <Eye className="w-4 h-4 mr-2" />
+                          {expandedThesis === thesis.id ? 'Hide' : 'View'}
+                          {expandedThesis === thesis.id ? 
+                            <ChevronUp className="w-4 h-4 ml-2" /> : 
+                            <ChevronDown className="w-4 h-4 ml-2" />
+                          }
                         </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+
+                  {expandedThesis === thesis.id && (
+                    <div className="border-t border-white/10 mt-4">
+                      <CardContent className="pt-6 space-y-6">
+                        <div className="text-sm text-green-400">✓ Expanded content is working - Thesis ID: {thesis.id}</div>
+                        
+                        {/* Quick Stats */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="text-center p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                            <div className="text-sm opacity-70">Profit Target</div>
+                            <div className="text-lg font-bold text-green-400">+{thesis.profitTarget[0]}%</div>
+                          </div>
+                          <div className="text-center p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                            <div className="text-sm opacity-70">Trade Goal</div>
+                            <div className="text-lg font-bold">{thesis.tradeCount[0]} trades</div>
+                          </div>
+                          <div className="text-center p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                            <div className="text-sm opacity-70">Max Position</div>
+                            <div className="text-lg font-bold text-orange-400">{thesis.maxPositionSize[0]}%</div>
+                          </div>
+                        </div>
+
+                        {/* Ecosystems & Strategies */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          <div>
+                            <h4 className="font-medium mb-3 flex items-center gap-2">
+                              <Target className="w-4 h-4" style={{ color: currentTheme.colors.primary.solid }} />
+                              Target Ecosystems
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                              {(thesis.ecosystems || []).map((ecosystem, index) => (
+                                <Badge 
+                                  key={index}
+                                  style={{
+                                    background: `rgba(${currentTheme.colors.primary.rgb}, 0.1)`,
+                                    color: currentTheme.colors.primary.solid,
+                                    border: `1px solid rgba(${currentTheme.colors.primary.rgb}, 0.2)`
+                                  }}
+                                >
+                                  {ecosystem}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <h4 className="font-medium mb-3 flex items-center gap-2">
+                              <TrendingUp className="w-4 h-4" style={{ color: '#10B981' }} />
+                              Trading Strategies
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                              {(thesis.strategies || []).map((strategy, index) => (
+                                <Badge 
+                                  key={index}
+                                  style={{
+                                    background: `rgba(16, 185, 129, 0.1)`,
+                                    color: '#10B981',
+                                    border: `1px solid rgba(16, 185, 129, 0.2)`
+                                  }}
+                                >
+                                  {strategy}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Neutral Conditions - Only show if market outlook is neutral */}
+                        {thesis.marketOutlook === 'neutral' && thesis.neutralConditions && (
+                          <div>
+                            <h4 className="font-medium mb-3 flex items-center gap-2">
+                              <Target className="w-4 h-4" style={{ color: '#6B7280' }} />
+                              Conditions to Change Outlook
+                            </h4>
+                            <div className="p-4 rounded-lg text-sm" style={{ background: 'rgba(107, 114, 128, 0.1)', border: '1px solid rgba(107, 114, 128, 0.2)' }}>
+                              {thesis.neutralConditions}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Risk Management */}
+                        <div>
+                          <h4 className="font-medium mb-3 flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4" style={{ color: '#EF4444' }} />
+                            Risk Management
+                          </h4>
+                          <div className="p-4 rounded-lg text-sm" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                            <strong>Stop Loss Rules:</strong> {thesis.stopLossRules || 'No specific rules defined'}
+                          </div>
+                        </div>
+
+                        {/* Version History */}
+                        {thesis.versions && thesis.versions.length > 0 && (
+                          <div>
+                            <h4 className="font-medium mb-3 flex items-center gap-2">
+                              <Calendar className="w-4 h-4" style={{ color: currentTheme.colors.primary.solid }} />
+                              Version History ({thesis.versions.length} {thesis.versions.length === 1 ? 'version' : 'versions'})
+                            </h4>
+                            <div className="space-y-3">
+                              {thesis.versions.slice(-3).reverse().map((version: any, index: number) => (
+                                <div 
+                                  key={version.id}
+                                  className="p-3 rounded-lg text-sm border"
+                                  style={{ 
+                                    background: index === 0 ? 'rgba(16, 185, 129, 0.05)' : 'rgba(255,255,255,0.05)',
+                                    borderColor: index === 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.1)'
+                                  }}
+                                >
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="font-medium">
+                                      Version {version.versionNumber} {index === 0 && '(Latest)'}
+                                    </span>
+                                    <span className="text-xs opacity-60">
+                                      {format(new Date(version.createdAt), 'MMM dd, HH:mm')}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1">
+                                    {version.changes.map((change: string, changeIndex: number) => (
+                                      <div key={changeIndex} className="text-xs opacity-80">
+                                        • {change}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                              {thesis.versions.length > 3 && (
+                                <div className="text-xs text-center opacity-60">
+                                  ... and {thesis.versions.length - 3} earlier versions
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex gap-3 pt-2">
+                          <Link to={`/thesis/new?edit=${thesis.id}`}>
+                            <Button 
+                              variant="outline"
+                              size="sm"
+                              style={{
+                                background: `rgba(${currentTheme.colors.primary.rgb}, 0.1)`,
+                                borderColor: `rgba(${currentTheme.colors.primary.rgb}, 0.3)`,
+                                color: currentTheme.colors.text.primary
+                              }}
+                            >
+                              <Edit3 className="w-4 h-4 mr-2" />
+                              Edit Thesis
+                            </Button>
+                          </Link>
+                        </div>
+                      </CardContent>
+                    </div>
+                  )}
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   )
 }

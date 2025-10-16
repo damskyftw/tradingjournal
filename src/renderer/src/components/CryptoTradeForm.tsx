@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
+// import { useModernTheme } from '../contexts/ModernThemeContext';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -13,35 +14,96 @@ import {
   Target,
   ShieldX,
   Calendar,
-  MessageSquare
+  MessageSquare,
+  Search,
+  AlertCircle
 } from 'lucide-react';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Select } from './ui/select';
+// Import accessible form components
+import { 
+  Form,
+  FormField,
+  FormLabel,
+  FormControl,
+  FormDescription,
+  FormMessage,
+  FormItem
+} from './ui/form';
+import { Input } from './ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Textarea } from './ui/textarea';
 import { ImageUpload } from './ImageUpload';
 import { useTradeActions } from '../store';
-import { useToast } from './Toast';
+import { useNotifications } from '../store';
 import type { Trade } from '../../../shared/types';
 
-// Simplified crypto trade schema
+// Enhanced crypto trade schema with comprehensive validation
 const CryptoTradeSchema = z.object({
   id: z.string(),
-  ticker: z.string().min(1, 'Crypto pair is required (e.g., BTC/USDT)'),
+  ticker: z.string()
+    .min(1, 'Crypto pair is required')
+    .regex(/^[A-Z]{2,6}\/[A-Z]{2,6}$/, 'Please use format like BTC/USDT, ETH/BTC, etc.')
+    .transform(val => val.toUpperCase()),
   type: z.enum(['long', 'short']),
-  entryDate: z.string(),
-  entryPrice: z.number().min(0.00001, 'Entry price must be positive'),
-  stopLoss: z.number().optional(),
-  takeProfit: z.number().optional(),
-  positionSize: z.number().min(0.01, 'Position size must be positive'),
-  leverage: z.number().min(1).max(100).optional(),
-  tradeIdea: z.string().min(10, 'Trade idea must be at least 10 characters'),
+  entryDate: z.string()
+    .min(1, 'Entry date is required')
+    .refine(val => !isNaN(Date.parse(val)), 'Please enter a valid date'),
+  entryPrice: z.number()
+    .min(0.00001, 'Entry price must be greater than 0')
+    .max(10000000, 'Entry price seems too high, please verify'),
+  stopLoss: z.number()
+    .min(0.00001, 'Stop loss must be greater than 0')
+    .max(10000000, 'Stop loss seems too high, please verify')
+    .optional(),
+  takeProfit: z.number()
+    .min(0.00001, 'Take profit must be greater than 0')
+    .max(10000000, 'Take profit seems too high, please verify')
+    .optional(),
+  positionSize: z.number()
+    .min(1, 'Position size must be at least $1')
+    .max(1000000, 'Position size seems very large, please verify'),
+  leverage: z.number()
+    .min(1, 'Leverage must be at least 1x')
+    .max(100, 'Leverage cannot exceed 100x')
+    .optional(),
+  tradeIdea: z.string()
+    .min(20, 'Trade analysis must be at least 20 characters')
+    .max(2000, 'Trade analysis cannot exceed 2000 characters'),
   screenshots: z.array(z.string()).default([]),
   tags: z.array(z.string()).default([]),
   createdAt: z.string(),
   updatedAt: z.string()
+})
+.refine(data => {
+  // Validate stop loss makes sense for position type
+  if (data.stopLoss && data.entryPrice) {
+    if (data.type === 'long' && data.stopLoss >= data.entryPrice) {
+      return false;
+    }
+    if (data.type === 'short' && data.stopLoss <= data.entryPrice) {
+      return false;
+    }
+  }
+  return true;
+}, {
+  message: "Stop loss must be below entry price for long positions, above for short positions",
+  path: ["stopLoss"]
+})
+.refine(data => {
+  // Validate take profit makes sense for position type
+  if (data.takeProfit && data.entryPrice) {
+    if (data.type === 'long' && data.takeProfit <= data.entryPrice) {
+      return false;
+    }
+    if (data.type === 'short' && data.takeProfit >= data.entryPrice) {
+      return false;
+    }
+  }
+  return true;
+}, {
+  message: "Take profit must be above entry price for long positions, below for short positions",
+  path: ["takeProfit"]
 });
 
 type CryptoTradeFormData = z.infer<typeof CryptoTradeSchema>;
@@ -58,8 +120,9 @@ export const CryptoTradeForm: React.FC<CryptoTradeFormProps> = ({
   onCancel
 }) => {
   const navigate = useNavigate();
+  // const { currentTheme } = useModernTheme();
   const { saveTrade } = useTradeActions();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useNotifications();
   const [isSaving, setIsSaving] = useState(false);
   const [screenshots, setScreenshots] = useState<string[]>(trade?.screenshots || []);
 
@@ -67,7 +130,9 @@ export const CryptoTradeForm: React.FC<CryptoTradeFormProps> = ({
     id: trade?.id || crypto.randomUUID(),
     ticker: trade?.ticker || '',
     type: (trade?.type as 'long' | 'short') || 'long',
-    entryDate: trade?.entryDate || new Date().toISOString().slice(0, 16),
+    entryDate: trade?.entryDate 
+      ? (trade.entryDate.includes('T') ? trade.entryDate.slice(0, 16) : trade.entryDate)
+      : new Date().toISOString().slice(0, 16),
     entryPrice: trade?.entryPrice || 0,
     stopLoss: trade?.preTradeNotes?.stopLoss,
     takeProfit: trade?.preTradeNotes?.targetPrice,
@@ -86,7 +151,7 @@ export const CryptoTradeForm: React.FC<CryptoTradeFormProps> = ({
     mode: 'onChange'
   });
 
-  const { register, handleSubmit, watch, setValue, formState: { errors, isValid } } = form;
+  const { handleSubmit, watch, setValue, formState: { errors, isValid } } = form;
   const watchedType = watch('type');
   const watchedEntryPrice = watch('entryPrice');
   const watchedStopLoss = watch('stopLoss');
@@ -112,12 +177,21 @@ export const CryptoTradeForm: React.FC<CryptoTradeFormProps> = ({
     setIsSaving(true);
     
     try {
+      console.log('=== CryptoTradeForm: Starting save process ===');
+      console.log('Form data:', data);
+      
       // Convert form data to Trade format
+      // Fix date format - convert from YYYY-MM-DDTHH:MM to full ISO string
+      const entryDate = data.entryDate.includes('T') 
+        ? new Date(data.entryDate).toISOString()
+        : data.entryDate;
+      
       const tradeData: Trade = {
         id: data.id,
         ticker: data.ticker,
         type: data.type,
-        entryDate: data.entryDate,
+        status: 'planning',
+        entryDate: entryDate,
         entryPrice: data.entryPrice,
         quantity: data.positionSize,
         preTradeNotes: {
@@ -132,10 +206,13 @@ export const CryptoTradeForm: React.FC<CryptoTradeFormProps> = ({
         screenshots: data.screenshots,
         tags: data.tags,
         createdAt: data.createdAt,
-        updatedAt: data.updatedAt
+        updatedAt: new Date().toISOString() // Always use current time for updatedAt
       };
 
+      console.log('Trade data to save:', tradeData);
+      
       const result = await saveTrade(tradeData);
+      console.log('Save result:', result);
       
       if (result) {
         showSuccess('Trade saved successfully!');
@@ -145,9 +222,13 @@ export const CryptoTradeForm: React.FC<CryptoTradeFormProps> = ({
           navigate(`/trades/${tradeData.id}`);
         }
       } else {
+        console.error('Save failed: result was falsy');
         showError('Failed to save trade');
       }
     } catch (error) {
+      console.error('=== CryptoTradeForm: Save error ===');
+      console.error('Error:', error);
+      console.error('Error message:', error instanceof Error ? error.message : 'Unknown error');
       showError(error instanceof Error ? error.message : 'Failed to save trade');
     } finally {
       setIsSaving(false);
@@ -163,17 +244,18 @@ export const CryptoTradeForm: React.FC<CryptoTradeFormProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">
-            {trade?.id ? 'Edit Crypto Trade' : 'New Crypto Trade'}
-          </h1>
-          <p className="text-slate-600">
-            Document your crypto trading setup and analysis
-          </p>
-        </div>
+    <div className="min-h-screen p-6 transition-all duration-500 bg-gray-50 text-gray-900">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2 text-blue-600">
+              {trade?.id ? 'Edit Crypto Trade' : 'New Crypto Trade'}
+            </h1>
+            <p className="text-gray-600">
+              Document your crypto trading setup and analysis
+            </p>
+          </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" onClick={handleCancel}>
             <X className="h-4 w-4 mr-2" />
@@ -190,187 +272,285 @@ export const CryptoTradeForm: React.FC<CryptoTradeFormProps> = ({
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <Form {...form}>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Basic Trade Info */}
-        <Card>
+        <Card className="bg-white border border-gray-200 shadow-md">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-gray-900">
               <DollarSign className="h-5 w-5" />
               Trade Setup
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-gray-600">
               Enter your crypto trading pair and position details
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="ticker">Crypto Pair *</Label>
-                <Input
-                  id="ticker"
-                  placeholder="e.g., BTC/USDT, ETH/USDT"
-                  {...register('ticker')}
-                  className={errors.ticker ? 'border-red-500' : ''}
-                />
-                {errors.ticker && (
-                  <p className="text-red-500 text-sm mt-1">{errors.ticker.message}</p>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* Crypto Pair */}
+              <FormField
+                control={form.control}
+                name="ticker"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Crypto Pair *</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="BTC/USDT, ETH/BTC, SOL/USDT"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Use format like BTC/USDT - will be automatically capitalized
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
                 )}
-              </div>
+              />
 
-              <div>
-                <Label htmlFor="type">Direction *</Label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={watchedType === 'long' ? 'default' : 'outline'}
-                    className={`flex-1 ${watchedType === 'long' ? 'bg-green-600 hover:bg-green-700' : ''}`}
-                    onClick={() => setValue('type', 'long')}
-                  >
-                    <TrendingUp className="h-4 w-4 mr-2" />
-                    Long
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={watchedType === 'short' ? 'default' : 'outline'}
-                    className={`flex-1 ${watchedType === 'short' ? 'bg-red-600 hover:bg-red-700' : ''}`}
-                    onClick={() => setValue('type', 'short')}
-                  >
-                    <TrendingDown className="h-4 w-4 mr-2" />
-                    Short
-                  </Button>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="entryDate">Entry Date *</Label>
-                <Input
-                  id="entryDate"
-                  type="datetime-local"
-                  {...register('entryDate')}
-                  className={errors.entryDate ? 'border-red-500' : ''}
-                />
-                {errors.entryDate && (
-                  <p className="text-red-500 text-sm mt-1">{errors.entryDate.message}</p>
+              {/* Direction */}
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Position Direction *</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select position direction" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="long">Long Position (Buy)</SelectItem>
+                        <SelectItem value="short">Short Position (Sell)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
                 )}
-              </div>
+              />
 
-              <div>
-                <Label htmlFor="positionSize">Position Size (USDT) *</Label>
-                <Input
-                  id="positionSize"
-                  type="number"
-                  step="0.01"
-                  placeholder="1000"
-                  {...register('positionSize', { valueAsNumber: true })}
-                  className={errors.positionSize ? 'border-red-500' : ''}
-                />
-                {errors.positionSize && (
-                  <p className="text-red-500 text-sm mt-1">{errors.positionSize.message}</p>
+              {/* Entry Date */}
+              <FormField
+                control={form.control}
+                name="entryDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Entry Date & Time *</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="datetime-local"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      When you plan to enter or entered the position
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
                 )}
-              </div>
+              />
+
+              {/* Position Size */}
+              <FormField
+                control={form.control}
+                name="positionSize"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Position Size (USDT) *</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="1000"
+                        {...field}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Total amount you're investing in USDT
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
             </div>
           </CardContent>
         </Card>
 
         {/* Price Levels */}
-        <Card>
+        <Card className="bg-white border border-gray-200 shadow-md">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-gray-900">
               <Target className="h-5 w-5" />
               Price Levels
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-gray-600">
               Set your entry, stop loss, and take profit levels
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="entryPrice">Entry Price *</Label>
-                <Input
-                  id="entryPrice"
-                  type="number"
-                  step="0.00001"
-                  placeholder="0.00000"
-                  {...register('entryPrice', { valueAsNumber: true })}
-                  className={errors.entryPrice ? 'border-red-500' : ''}
-                />
-                {errors.entryPrice && (
-                  <p className="text-red-500 text-sm mt-1">{errors.entryPrice.message}</p>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              
+              {/* Entry Price */}
+              <FormField
+                control={form.control}
+                name="entryPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Entry Price *</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.00001"
+                        placeholder="50000.00"
+                        {...field}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Target entry price for your position
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
                 )}
-              </div>
+              />
 
-              <div>
-                <Label htmlFor="stopLoss">Stop Loss</Label>
-                <Input
-                  id="stopLoss"
-                  type="number"
-                  step="0.00001"
-                  placeholder="0.00000"
-                  {...register('stopLoss', { valueAsNumber: true })}
-                />
-              </div>
+              {/* Stop Loss */}
+              <FormField
+                control={form.control}
+                name="stopLoss"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Stop Loss</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.00001"
+                        placeholder="47500.00"
+                        {...field}
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {watchedType === 'long' ? 'Below entry price to limit losses' : 'Above entry price to limit losses'}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-              <div>
-                <Label htmlFor="takeProfit">Take Profit</Label>
-                <Input
-                  id="takeProfit"
-                  type="number"
-                  step="0.00001"
-                  placeholder="0.00000"
-                  {...register('takeProfit', { valueAsNumber: true })}
-                />
-              </div>
+              {/* Take Profit */}
+              <FormField
+                control={form.control}
+                name="takeProfit"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Take Profit</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.00001"
+                        placeholder="55000.00"
+                        {...field}
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {watchedType === 'long' ? 'Above entry price to secure profits' : 'Below entry price to secure profits'}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
             </div>
 
+            {/* Risk/Reward Ratio Display */}
             {riskRewardRatio && (
-              <div className="bg-slate-50 p-3 rounded-lg">
-                <div className="text-sm font-medium text-slate-700">
-                  Risk/Reward Ratio: <span className="text-blue-600">{riskRewardRatio}:1</span>
-                </div>
-                <div className="text-xs text-slate-500 mt-1">
-                  {parseFloat(riskRewardRatio) >= 2 ? 'Good risk/reward ratio ✓' : 
-                   parseFloat(riskRewardRatio) >= 1 ? 'Acceptable risk/reward ratio' : 
-                   'Consider improving risk/reward ratio'}
+              <div className={`p-4 rounded-lg border-2 transition-all duration-300 ${
+                parseFloat(riskRewardRatio) >= 2 
+                  ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800'
+                  : parseFloat(riskRewardRatio) >= 1
+                  ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800'
+                  : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className={`text-lg font-bold flex items-center gap-2 ${
+                      parseFloat(riskRewardRatio) >= 2 
+                        ? 'text-green-700 dark:text-green-400'
+                        : parseFloat(riskRewardRatio) >= 1
+                        ? 'text-blue-700 dark:text-blue-400'
+                        : 'text-red-700 dark:text-red-400'
+                    }`}>
+                      <Target className="h-5 w-5" />
+                      Risk/Reward: {riskRewardRatio}:1
+                    </div>
+                    <div className="text-sm mt-1 font-medium text-slate-600 dark:text-slate-400">
+                      {parseFloat(riskRewardRatio) >= 2 ? '🎯 Excellent ratio!' : 
+                       parseFloat(riskRewardRatio) >= 1 ? '✅ Acceptable ratio' : 
+                       '⚠️ Consider improving ratio'}
+                    </div>
+                  </div>
+                  <div className="text-3xl">
+                    {parseFloat(riskRewardRatio) >= 2 ? '🚀' : parseFloat(riskRewardRatio) >= 1 ? '👍' : '💡'}
+                  </div>
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Trade Idea */}
-        <Card>
+        {/* Trade Analysis */}
+        <Card className="bg-white border border-gray-200 shadow-md">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-gray-900">
               <MessageSquare className="h-5 w-5" />
-              Trade Idea & Analysis
+              Trade Analysis & Rationale
             </CardTitle>
-            <CardDescription>
-              Explain your reasoning for this trade
+            <CardDescription className="text-gray-600">
+              Explain your reasoning, technical analysis, and why you believe this trade will be profitable
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Textarea
-              placeholder="Describe your trade idea, technical analysis, market conditions, and why you believe this setup will be profitable..."
-              rows={4}
-              {...register('tradeIdea')}
-              className={errors.tradeIdea ? 'border-red-500' : ''}
+            <FormField
+              control={form.control}
+              name="tradeIdea"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Trade Analysis *</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Describe your trade idea, technical analysis, market conditions, news catalysts, and why you believe this setup will be profitable. Include timeframes, key levels, and risk factors..."
+                      rows={6}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Minimum 20 characters. Include technical analysis, market conditions, catalysts, and risk assessment.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            {errors.tradeIdea && (
-              <p className="text-red-500 text-sm mt-1">{errors.tradeIdea.message}</p>
-            )}
           </CardContent>
         </Card>
 
         {/* Screenshots */}
-        <Card>
+        <Card className="bg-white border border-gray-200 shadow-md">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-gray-900">
               <ImageIcon className="h-5 w-5" />
               Chart Screenshots
             </CardTitle>
-            <CardDescription>
-              Upload screenshots of your charts, setup, or analysis
+            <CardDescription className="text-gray-600">
+              Upload screenshots of your charts, technical analysis, or market setup
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -383,22 +563,28 @@ export const CryptoTradeForm: React.FC<CryptoTradeFormProps> = ({
           </CardContent>
         </Card>
 
-        {/* Form Errors */}
+        {/* Form Errors Summary */}
         {Object.keys(errors).length > 0 && (
-          <Card className="border-red-200 bg-red-50">
+          <Card className="border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800">
             <CardContent className="p-4">
-              <h3 className="font-medium text-red-800 mb-2">Please fix the following errors:</h3>
-              <ul className="text-sm text-red-700 space-y-1">
+              <h3 className="font-medium text-red-800 dark:text-red-400 mb-2 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                Please fix the following errors:
+              </h3>
+              <ul className="text-sm text-red-700 dark:text-red-300 space-y-1">
                 {Object.entries(errors).map(([field, error]) => (
                   <li key={field}>
-                    <strong>{field}:</strong> {error?.message || 'Invalid value'}
+                    <strong className="capitalize">{field.replace(/([A-Z])/g, ' $1')}:</strong>{' '}
+                    {error?.message || 'Invalid value'}
                   </li>
                 ))}
               </ul>
             </CardContent>
           </Card>
         )}
-      </form>
+        </form>
+      </Form>
+      </div>
     </div>
   );
 };

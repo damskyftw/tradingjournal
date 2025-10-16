@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 import { useTradeSelectors, useTradeActions } from '../store'
 import { useModals, useNotifications } from '../store'
-import { TradeForm } from '../components/TradeForm'
+import { CryptoTradeForm } from '../components/CryptoTradeForm'
 import type { Trade } from '../../../shared/types'
 import { format } from 'date-fns'
 
@@ -190,7 +190,7 @@ export function TradeDetail() {
 
   if (isEditing) {
     return (
-      <TradeForm 
+      <CryptoTradeForm 
         trade={trade}
         onSave={handleSave}
         onCancel={handleCancelEdit}
